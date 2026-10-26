@@ -1,1 +1,34 @@
-.env 
+# Środowisko i sekrety
+.env
+.env.*
+!.env.example
+
+# Wirtualne środowiska Pythona
+venv/
+.venv/
+env/
+*/venv/
+*/.venv/
+
+# Cache i kompilaty Pythona
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+backend/venv/
+
+# Migracje i narzędzia
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+.npm
+
+# Docker
+*.local
