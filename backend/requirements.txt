@@ -1,4 +1,20 @@
-SQLAlchemy>=2.0.0
-alembic>=1.13.0
-psycopg2-binary>=2.9.9
-python-dotenv>=1.0.0
+# --- Warstwa HTTP / REST API (OpenAPI + Swagger UI) ---
+Flask>=3.1,<4
+flask-smorest>=0.46
+marshmallow>=3.22
+flask-cors>=5.0
+
+# --- ORM / baza danych ---
+SQLAlchemy>=2.0,<2.2
+alembic>=1.13
+psycopg2-binary>=2.9.10
+
+# --- IAM: weryfikacja tokenów JWT wydawanych przez Keycloak (JWKS, RS256) ---
+PyJWT[crypto]>=2.9
+
+# --- Integracje: kalendarz (.ics) i powiadomienia e-mail ---
+icalendar>=6.0
+sendgrid>=6.11
+
+# --- Konfiguracja ---
+python-dotenv>=1.0

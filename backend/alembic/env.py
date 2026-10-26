@@ -3,6 +3,7 @@ from os.path import abspath, dirname
 sys.path.insert(0, dirname(dirname(abspath(__file__))))
 
 from app.models import Base
+from app.core.config import settings
 
 from logging.config import fileConfig
 
@@ -14,6 +15,10 @@ from alembic import context
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Jedno źródło prawdy dla danych dostępowych: .env -> app.core.config.settings
+# ('%' musi być podwojony ze względu na interpolację configparsera)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
