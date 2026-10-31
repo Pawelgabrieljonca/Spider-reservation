@@ -31,15 +31,22 @@ class ReservationCollection(MethodView):
     @require_roles(UserRole.CLIENT)
     @blp.arguments(ReservationCreateSchema)
     @blp.response(201, ReservationSchema)
-    @blp.alt_response(404, description="Termin nie istnieje")
-    @blp.alt_response(409, description="Brak miejsc, termin zablokowany/rozpoczęty lub rezerwacja już istnieje")
+    @blp.alt_response(404, description="Okno dyżuru lub termin nie istnieje")
+    @blp.alt_response(
+        409,
+        description="Brak miejsc, kolizja z inną rezerwacją, dyżur zablokowany/rozpoczęty lub rezerwacja już istnieje",
+    )
     def post(self, payload):
-        """Zapis na termin. Limit miejsc jest sprawdzany transakcyjnie (SELECT ... FOR UPDATE)."""
+        """Transakcyjny zapis na wybrany przedział czasowy w oknie dyżuru instruktora (SELECT ... FOR UPDATE)."""
         return reservation_service.create_reservation(
             db_session,
-            slot_id=payload["slot_id"],
             client_id=current_user().id,
+            availability_window_id=payload.get("availability_window_id"),
+            start_time=payload.get("start_time"),
+            slot_type=payload.get("slot_type"),
+            slot_id=payload.get("slot_id"),
             needs_equipment=payload["needs_equipment"],
+            phone_number=payload.get("phone_number"),
         )
 
 

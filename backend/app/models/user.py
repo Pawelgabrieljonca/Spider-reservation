@@ -4,10 +4,18 @@ from sqlalchemy import String, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
+
 class UserRole(str, enum.Enum):
     CLIENT = "ROLE_CLIENT"
     INSTRUCTOR = "ROLE_INSTRUCTOR"
     ADMIN = "ROLE_ADMIN"
+
+
+class ExperienceLevel(str, enum.Enum):
+    BEGINNER = "BEGINNER"
+    INTERMEDIATE = "INTERMEDIATE"
+    ADVANCED = "ADVANCED"
+
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
@@ -18,12 +26,22 @@ class User(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
+    phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    shoe_size: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    experience_level: Mapped[str | None] = mapped_column(String(32), nullable=True)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.CLIENT, nullable=False)
 
     # Relacje SQLAlchemy:
-    instructor_slots: Mapped[List["TrainingSlot"]] = relationship(back_populates="instructor", cascade="all, delete-orphan")
+    availability_windows: Mapped[List["AvailabilityWindow"]] = relationship(
+        back_populates="instructor", cascade="all, delete-orphan"
+    )
+    instructor_slots: Mapped[List["TrainingSlot"]] = relationship(
+        back_populates="instructor", cascade="all, delete-orphan"
+    )
     reservations: Mapped[List["Reservation"]] = relationship(back_populates="client")
     progress_records: Mapped[List["ProgressEntry"]] = relationship(
         foreign_keys="[ProgressEntry.client_id]", back_populates="client"
+    )
+    notifications: Mapped[List["InAppNotification"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
     )

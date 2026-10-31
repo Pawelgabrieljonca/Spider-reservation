@@ -21,7 +21,7 @@ def create_app(config_object: type = FlaskConfig) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_object)
 
-    CORS(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}})
+    CORS(app, resources={r"/*": {"origins": app.config["CORS_ORIGINS"]}})
 
     api = Api(app)
     # Schemat bezpieczeństwa dla tokenów JWT z Keycloak (przycisk "Authorize" w Swagger UI)

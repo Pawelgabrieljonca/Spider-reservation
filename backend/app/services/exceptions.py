@@ -20,8 +20,14 @@ class NotFoundError(DomainError):
     code = "NOT_FOUND"
 
 
+class ForbiddenError(DomainError):
+    """Brak uprawnień do zasobu należącego do innego instruktora lub klienta."""
+    http_status = 403
+    code = "FORBIDDEN"
+
+
 class SlotUnavailableError(DomainError):
-    """Termin jest zablokowany lub już się rozpoczął."""
+    """Termin lub dyżur jest zablokowany albo już się rozpoczął."""
     http_status = 409
     code = "SLOT_UNAVAILABLE"
 
@@ -33,7 +39,7 @@ class SlotFullError(DomainError):
 
 
 class AlreadyReservedError(DomainError):
-    """Klient posiada już aktywną rezerwację tego terminu."""
+    """Klient posiada już aktywną rezerwację w tym terminie."""
     http_status = 409
     code = "ALREADY_RESERVED"
 
@@ -51,27 +57,33 @@ class CancellationDeadlinePassedError(DomainError):
 
 
 class SlotOverlapError(DomainError):
-    """Termin koliduje z innym slotem tego instruktora."""
+    """Wybrany przedział czasowy nakłada się na inny dyżur lub zarezerwowane zajęcia."""
     http_status = 409
     code = "SLOT_OVERLAP"
 
 
 class SlotHasReservationsError(DomainError):
-    """Nie można usunąć terminu z aktywnymi rezerwacjami. Zamiast tego zablokuj termin."""
+    """Nie można usunąć dyżuru z aktywnymi rezerwacjami. Zamiast tego zablokuj dyżur."""
     http_status = 409
     code = "SLOT_HAS_RESERVATIONS"
 
 
 class PastSlotError(DomainError):
-    """Nie można utworzyć terminu w przeszłości."""
+    """Nie można utworzyć dyżuru ani terminu w przeszłości."""
     http_status = 422
     code = "PAST_SLOT"
 
 
 class InvalidSlotDurationError(DomainError):
-    """Czas trwania terminu nie zgadza się z wybranym typem (1h dla indywidualnego, 1.5h dla grupy)."""
+    """Nieprawidłowy czas trwania dyżuru lub rezerwacji (minimum 60 minut w granicach dyżuru)."""
     http_status = 422
     code = "INVALID_SLOT_DURATION"
+
+
+class OutsideOperatingHoursError(DomainError):
+    """Zajęcia i dyżury mogą odbywać się wyłącznie w godzinach 09:00 - 22:00"""
+    http_status = 422
+    code = "OUTSIDE_OPERATING_HOURS"
 
 
 class ClientNotFoundError(DomainError):

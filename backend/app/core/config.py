@@ -28,6 +28,13 @@ class Settings:
     KEYCLOAK_REALM: str = os.getenv("KEYCLOAK_REALM", "spider-climbing")
     KEYCLOAK_CLIENT_ID: str = os.getenv("KEYCLOAK_CLIENT_ID", "spider-frontend")
 
+    # SendGrid API & moduł powiadomień (specyfikacja pkt 5 „Obsługa powiadomień”).
+    # Domyślnie wyłączone: brak klucza API nie blokuje testów ani pracy offline –
+    # powiadomienia są wtedy logowane jako [NOTIFICATION MOCK].
+    NOTIFICATIONS_ENABLED: bool = _env_bool("NOTIFICATIONS_ENABLED", False)
+    SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
+    SENDGRID_FROM_EMAIL: str = os.getenv("SENDGRID_FROM_EMAIL", "rezerwacje@cw-spider.pl")
+
     @property
     def DATABASE_URL(self) -> str:
         # Jawny sterownik: SQLAlchemy 2.1 dla samego "postgresql://" domyślnie wybiera psycopg (v3)
