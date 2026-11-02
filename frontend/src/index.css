@@ -14,3 +14,17 @@ body {
   font-size: 16px;
   line-height: 1.5;
 }
+
+/* Ukrycie paska przewijania (suwaka) przy zachowaniu pełnej możliwości scrollowania */
+.no-scrollbar,
+html.no-scrollbar,
+body.no-scrollbar {
+  -ms-overflow-style: none; /* IE i Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar,
+html.no-scrollbar::-webkit-scrollbar,
+body.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

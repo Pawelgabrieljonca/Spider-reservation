@@ -60,14 +60,8 @@ export default function AppRoutes() {
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<RootEntry />} />
-          <Route
-            path="/instructors"
-            element={
-              <ProtectedRoute requiredRole="ROLE_CLIENT">
-                <InstructorsPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/instructors" element={<InstructorsPage />} />
+          <Route path="/terminy" element={<ClientSchedulePage mode="slots" />} />
 
           {/* Moduł Administratora */}
           <Route
@@ -96,14 +90,7 @@ export default function AppRoutes() {
           />
 
           {/* Moduł Klienta */}
-          <Route
-            path="/app/client"
-            element={
-              <ProtectedRoute requiredRole="ROLE_CLIENT">
-                <ClientSchedulePage mode="slots" />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/app/client" element={<ClientSchedulePage mode="slots" />} />
           <Route
             path="/app/client/reservations"
             element={

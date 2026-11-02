@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Clock,
   Footprints,
+  LogIn,
   Phone,
   RefreshCw,
   Search,
@@ -19,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import apiClient from '../../api/client';
+import { useAuth } from '../../auth/useAuth';
 import Pagination from '../../components/Pagination';
 import {
   BTN_DANGER,
@@ -223,6 +225,7 @@ function InstructorSummaryAvatar({ name, sizeClass = 'w-14 h-14' }) {
 
 export default function ClientSchedulePage({ mode = 'slots' }) {
   const navigate = useNavigate();
+  const { isAuthenticated, login, keycloak, clearSessionExpiredNotice } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const instructorFromUrl = searchParams.get('instructor') || '';
   const section = mode === 'reservations' ? 'reservations' : 'slots';
@@ -241,7 +244,7 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
   const [knownInstructors, setKnownInstructors] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(true);
-  const [loadingReservations, setLoadingReservations] = useState(true);
+  const [loadingReservations, setLoadingReservations] = useState(isAuthenticated);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -281,6 +284,8 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
 
   // Pobieranie rezerwacji oraz profilu wspinacza zalogowanego klienta
   useEffect(() => {
+    if (!isAuthenticated) return undefined;
+
     let active = true;
     apiClient
       .get('/api/v1/client/reservations')
@@ -311,7 +316,7 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   // Dynamiczne pobieranie dostępnych godzin startu dla wybranego miesiąca i wybranej usługi (60 min / 90 min)
   useEffect(() => {
@@ -354,22 +359,26 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
 
   const handleManualRefresh = useCallback(async () => {
     setLoadingSlots(true);
-    setLoadingReservations(true);
+    if (isAuthenticated) {
+      setLoadingReservations(true);
+    }
     setErrorMsg(null);
     try {
       const bounds = buildMonthIsoBounds(viewMonth.year, viewMonth.month);
-      const [slotsRes, myRes] = await Promise.all([
-        apiClient.get('/api/v1/client/slots', {
-          params: {
-            date_from: bounds.date_from,
-            date_to: bounds.date_to,
-            slot_type: selectedServiceType,
-            only_free: true,
-          },
-        }),
-        apiClient.get('/api/v1/client/reservations'),
-      ]);
-      const fetched = Array.isArray(slotsRes.data) ? slotsRes.data : [];
+      const slotPromise = apiClient.get('/api/v1/client/slots', {
+        params: {
+          date_from: bounds.date_from,
+          date_to: bounds.date_to,
+          slot_type: selectedServiceType,
+          only_free: true,
+        },
+      });
+      const resPromise = isAuthenticated
+        ? apiClient.get('/api/v1/client/reservations')
+        : Promise.resolve(null);
+
+      const [slotsRes, myRes] = await Promise.all([slotPromise, resPromise]);
+      const fetched = Array.isArray(slotsRes?.data) ? slotsRes.data : [];
       setSlots(fetched);
       setKnownInstructors((prev) => {
         const next = new Set(prev);
@@ -378,7 +387,9 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
         }
         return Array.from(next).sort((a, b) => a.localeCompare(b, 'pl'));
       });
-      setReservations(Array.isArray(myRes.data) ? myRes.data : []);
+      if (myRes?.data) {
+        setReservations(Array.isArray(myRes.data) ? myRes.data : []);
+      }
       setNowMs(Date.now());
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Błąd odświeżania kalendarza rezerwacji.'));
@@ -386,7 +397,7 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
       setLoadingSlots(false);
       setLoadingReservations(false);
     }
-  }, [viewMonth.year, viewMonth.month, selectedServiceType]);
+  }, [viewMonth.year, viewMonth.month, selectedServiceType, isAuthenticated]);
 
   // Przedziały czasowe już potwierdzonych wizyt zalogowanego klienta (wykluczenie kolizji własnych)
   const clientReservedIntervals = useMemo(() => {
@@ -541,6 +552,11 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
   };
 
   const handleBookSelectedSlot = async () => {
+    if (!isAuthenticated) {
+      clearSessionExpiredNotice?.();
+      login({ redirectUri: window.location.href });
+      return;
+    }
     if (!selectedSlot || isSubmitting) return;
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -1069,20 +1085,26 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
                         <Phone className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Telefon kontaktowy</span>
                       </label>
-                      <Link
-                        to="/app/client/profile"
-                        className="text-xs font-medium text-emerald-700 hover:text-emerald-900 underline"
-                      >
-                        Edytuj profil
-                      </Link>
+                      {isAuthenticated && (
+                        <Link
+                          to="/app/client/profile"
+                          className="text-xs font-medium text-emerald-700 hover:text-emerald-900 underline"
+                        >
+                          Edytuj profil
+                        </Link>
+                      )}
                     </div>
                     <input
                       id="booking-contact-phone"
                       type="tel"
                       value={contactPhone}
-                      disabled={!selectedSlot || isSubmitting}
+                      disabled={!selectedSlot || isSubmitting || !isAuthenticated}
                       onChange={(e) => setContactPhone(e.target.value)}
-                      placeholder="np. +48 519 699 795"
+                      placeholder={
+                        isAuthenticated
+                          ? 'np. +48 519 699 795'
+                          : 'Wymagane zalogowanie'
+                      }
                       maxLength={20}
                       className={`${INPUT_CLASS} py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400`}
                     />
@@ -1106,21 +1128,27 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
                       <div className="px-3.5 py-2.5 bg-amber-50/70 border-t border-amber-100 flex items-center justify-between gap-2 text-xs text-amber-950">
                         <span className="inline-flex items-center gap-1.5 font-medium">
                           <Footprints className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                          {clientProfile?.shoe_size ? (
-                            <span>
-                              Rozmiar buta z Twojego profilu:{' '}
-                              <strong>EU {clientProfile.shoe_size}</strong>
-                            </span>
+                          {isAuthenticated ? (
+                            clientProfile?.shoe_size ? (
+                              <span>
+                                Rozmiar buta z Twojego profilu:{' '}
+                                <strong>EU {clientProfile.shoe_size}</strong>
+                              </span>
+                            ) : (
+                              <span>Nie zapisano jeszcze rozmiaru buta w profilu.</span>
+                            )
                           ) : (
-                            <span>Nie zapisano jeszcze rozmiaru buta w profilu.</span>
+                            <span>Sprzęt dobierzesz na miejscu w recepcji obiektu.</span>
                           )}
                         </span>
-                        <Link
-                          to="/app/client/profile"
-                          className="font-semibold text-amber-900 underline shrink-0"
-                        >
-                          {clientProfile?.shoe_size ? 'Zmień' : 'Uzupełnij'}
-                        </Link>
+                        {isAuthenticated && (
+                          <Link
+                            to="/app/client/profile"
+                            className="font-semibold text-amber-900 underline shrink-0"
+                          >
+                            {clientProfile?.shoe_size ? 'Zmień' : 'Uzupełnij'}
+                          </Link>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1128,18 +1156,55 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
 
                 {/* Przycisk CTA na desktopie (>= 768px) */}
                 <div className="hidden md:block space-y-2">
-                  <button
-                    type="button"
-                    disabled={!selectedSlot || isSubmitting}
-                    onClick={handleBookSelectedSlot}
-                    className={`${BTN_PRIMARY} w-full py-3.5 text-base`}
-                  >
-                    <CalendarCheck className="w-5 h-5" />
-                    <span>{isSubmitting ? 'Rezerwowanie terminu...' : 'Zarezerwuj termin'}</span>
-                  </button>
-                  <p className="text-xs text-center text-slate-500">
-                    Bezpłatne odwołanie wizyty możliwe do 12h przed rozpoczęciem zajęć.
-                  </p>
+                  {isAuthenticated ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={!selectedSlot || isSubmitting}
+                        onClick={handleBookSelectedSlot}
+                        className={`${BTN_PRIMARY} w-full py-3.5 text-base`}
+                      >
+                        <CalendarCheck className="w-5 h-5" />
+                        <span>{isSubmitting ? 'Rezerwowanie terminu...' : 'Zarezerwuj termin'}</span>
+                      </button>
+                      <p className="text-xs text-center text-slate-500">
+                        Bezpłatne odwołanie wizyty możliwe do 12h przed rozpoczęciem zajęć.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="space-y-2.5 bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Przeglądasz terminy jako gość. Aby zarezerwować wybrany trening, zaloguj
+                        się do swojego konta lub zarejestruj się.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={!selectedSlot}
+                        onClick={() => {
+                          clearSessionExpiredNotice?.();
+                          login({ redirectUri: window.location.href });
+                        }}
+                        className={`${BTN_PRIMARY} w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-50`}
+                      >
+                        <LogIn className="w-4 h-4" />
+                        <span>
+                          {selectedSlot
+                            ? 'Zaloguj się, aby zarezerwować'
+                            : 'Zaznacz termin, aby zarezerwować'}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearSessionExpiredNotice?.();
+                          keycloak.register({ redirectUri: window.location.href });
+                        }}
+                        className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold underline block mx-auto"
+                      >
+                        Nie masz konta? Zarejestruj się bezpłatnie
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </aside>
@@ -1166,14 +1231,29 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
                 )}
               </div>
 
-              <button
-                type="button"
-                disabled={!selectedSlot || isSubmitting}
-                onClick={handleBookSelectedSlot}
-                className={`${BTN_PRIMARY} shrink-0 px-5`}
-              >
-                {isSubmitting ? 'Zapisywanie...' : 'Zarezerwuj termin'}
-              </button>
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  disabled={!selectedSlot || isSubmitting}
+                  onClick={handleBookSelectedSlot}
+                  className={`${BTN_PRIMARY} shrink-0 px-5`}
+                >
+                  {isSubmitting ? 'Zapisywanie...' : 'Zarezerwuj termin'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!selectedSlot}
+                  onClick={() => {
+                    clearSessionExpiredNotice?.();
+                    login({ redirectUri: window.location.href });
+                  }}
+                  className={`${BTN_PRIMARY} shrink-0 px-4 text-xs sm:text-sm flex items-center gap-1.5 disabled:opacity-50`}
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Zaloguj się</span>
+                </button>
+              )}
             </div>
           </div>
         </>

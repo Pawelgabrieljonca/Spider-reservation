@@ -94,9 +94,9 @@ def _provision_user(claims: dict, roles: set[UserRole]) -> User:
     return user
 
 
-def current_user() -> User:
-    """Zalogowany użytkownik (dostępny wewnątrz endpointu chronionego `require_roles`)."""
-    return g.current_user
+def current_user() -> User | None:
+    """Zalogowany użytkownik (dostępny wewnątrz endpointu chronionego `require_roles` lub `optional_roles`)."""
+    return getattr(g, "current_user", None)
 
 
 def require_roles(*allowed: UserRole):
@@ -115,6 +115,33 @@ def require_roles(*allowed: UserRole):
             if not roles.intersection(allowed):
                 abort(403, message="Brak uprawnień do tego zasobu.")
             g.current_user = _provision_user(claims, roles)
+            return view(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def optional_roles(*allowed: UserRole):
+    """Dekorator endpointu: jeśli podano Bearer token, weryfikuje go i ustawia `g.current_user`.
+    Jeśli żądanie jest anonimowe (brak nagłówka Authorization), przechodzi dalej z `g.current_user = None`.
+    """
+
+    def decorator(view):
+        @functools.wraps(view)
+        def wrapper(*args, **kwargs):
+            auth_header = request.headers.get("Authorization", "").strip()
+            g.current_user = None
+            if auth_header:
+                scheme, _, token = auth_header.partition(" ")
+                if scheme.lower() == "bearer" and token.strip():
+                    try:
+                        claims = _decode_token(token.strip())
+                        roles = _token_roles(claims)
+                        if roles and (not allowed or roles.intersection(allowed)):
+                            g.current_user = _provision_user(claims, roles)
+                    except Exception:
+                        g.current_user = None
             return view(*args, **kwargs)
 
         return wrapper

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { AlertTriangle, LogIn, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
@@ -10,8 +11,23 @@ export default function Layout({ children }) {
 
   const isLanding = !isAuthenticated && location.pathname === '/';
 
+  useEffect(() => {
+    if (isLanding) {
+      document.documentElement.classList.add('no-scrollbar');
+      document.body.classList.add('no-scrollbar');
+      return () => {
+        document.documentElement.classList.remove('no-scrollbar');
+        document.body.classList.remove('no-scrollbar');
+      };
+    }
+  }, [isLanding]);
+
   return (
-    <div className="relative flex flex-col min-h-screen bg-slate-50 text-slate-900">
+    <div
+      className={`relative flex flex-col min-h-[100dvh] bg-slate-50 text-slate-900 ${
+        isLanding ? 'no-scrollbar' : ''
+      }`}
+    >
       <Navbar />
 
       {!isAuthenticated && sessionExpiredNotice && (
@@ -61,6 +77,7 @@ export default function Layout({ children }) {
       >
         {children}
       </main>
+
       <Footer />
     </div>
   );

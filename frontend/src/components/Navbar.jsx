@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LogIn, LogOut, Menu, User, UserPlus, X } from 'lucide-react';
+import { Menu, User, X } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import NotificationBell from './NotificationBell';
 
@@ -13,7 +13,6 @@ export default function Navbar() {
     logout,
     isLoading,
     hasRole,
-    keycloak,
     clearSessionExpiredNotice,
   } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -21,9 +20,9 @@ export default function Navbar() {
 
   const isLanding = !isAuthenticated && location.pathname === '/';
 
-  const handleRegister = () => {
+  const handleLogin = () => {
     clearSessionExpiredNotice?.();
-    keycloak.register();
+    login();
   };
 
   const isAdmin = hasRole('ROLE_ADMIN');
@@ -64,10 +63,15 @@ export default function Navbar() {
       { to: '/instructors', label: 'Instruktorzy', end: false },
       { to: '/app/client/profile', label: 'Mój profil', end: false }
     );
+  } else if (!isAuthenticated) {
+    navItems.push(
+      { to: '/app/client', label: 'Terminy', end: true },
+      { to: '/instructors', label: 'Instruktorzy', end: false }
+    );
   }
 
   const desktopLinkClass = ({ isActive }) =>
-    `inline-flex items-center min-h-[40px] px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+    `inline-flex items-center min-h-[40px] px-3.5 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
       isActive
         ? 'bg-emerald-600 text-white shadow-sm'
         : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200'
@@ -82,54 +86,108 @@ export default function Navbar() {
 
   const closeMobile = () => setMobileOpen(false);
 
+  // Wariant nawigacji na pełnoekranowej stronie startowej dla niezalogowanych
   if (isLanding) {
     return (
       <header className="absolute top-0 inset-x-0 z-40">
-        <div className="max-w-7xl mx-auto px-5 sm:px-10 lg:px-14 py-6 sm:py-8 flex items-center justify-between gap-4">
-          <NavLink
-            to="/"
-            className="inline-flex items-center shrink-0 focus:outline-none"
-            aria-label="Centrum Wspinaczkowe Spider — strona główna"
-          >
-            <img
-              src="/logospider.png"
-              alt="Centrum Wspinaczkowe Spider"
-              className="h-12 sm:h-20 md:h-24 w-auto object-contain drop-shadow-md"
-            />
-          </NavLink>
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-14 py-4 sm:py-6 md:py-8 flex items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-6 sm:gap-10">
+            <NavLink
+              to="/"
+              onClick={closeMobile}
+              className="inline-flex items-center shrink-0 focus:outline-none"
+              aria-label="Centrum Wspinaczkowe Spider — strona główna"
+            >
+              <img
+                src="/logospider.png"
+                alt="Centrum Wspinaczkowe Spider"
+                className="h-[72px] sm:h-[104px] md:h-[125px] w-auto object-contain drop-shadow-md"
+              />
+            </NavLink>
 
-          <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+            <nav className="hidden md:flex items-center gap-2" aria-label="Nawigacja strony startowej">
+              <NavLink
+                to="/app/client"
+                className="inline-flex items-center min-h-[42px] px-4 py-2 rounded-xl text-sm font-semibold text-white/90 hover:text-white hover:bg-white/10 active:bg-white/20 backdrop-blur-sm transition-colors"
+              >
+                Terminy
+              </NavLink>
+              <NavLink
+                to="/instructors"
+                className="inline-flex items-center min-h-[42px] px-4 py-2 rounded-xl text-sm font-semibold text-white/90 hover:text-white hover:bg-white/10 active:bg-white/20 backdrop-blur-sm transition-colors"
+              >
+                Instruktorzy
+              </NavLink>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
             {isLoading ? (
               <span className="text-xs sm:text-sm text-white/80 px-3 py-2">
                 Weryfikacja sesji...
               </span>
             ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => login()}
-                  className="inline-flex items-center justify-center gap-2 min-h-[42px] sm:min-h-[46px] px-3.5 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white bg-white/10 hover:bg-white/20 active:bg-white/25 border border-white/40 backdrop-blur-sm rounded-xl transition-colors"
-                >
-                  <LogIn className="w-4 h-4 hidden sm:inline" />
-                  <span>Zaloguj się</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleRegister}
-                  className="inline-flex items-center justify-center gap-2 min-h-[42px] sm:min-h-[46px] px-3.5 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-lg shadow-slate-950/30 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-colors"
-                >
-                  <UserPlus className="w-4 h-4 hidden sm:inline" />
-                  <span>Zarejestruj się</span>
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={handleLogin}
+                className="hidden md:inline-flex items-center justify-center min-h-[44px] px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-lg shadow-slate-950/40 transition-colors whitespace-nowrap"
+              >
+                Zaloguj do panelu
+              </button>
             )}
+
+            {/* Ikona hamburgera na mobile (< 768px) */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen((prev) => !prev)}
+              aria-expanded={mobileOpen}
+              aria-label="Otwórz menu nawigacji"
+              className="md:hidden inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-white/30 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white backdrop-blur-sm transition-colors"
+            >
+              {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
         </div>
+
+        {/* Wysuwane menu mobilne na stronie startowej */}
+        {mobileOpen && (
+          <div className="md:hidden border-t border-white/10 bg-slate-950/95 backdrop-blur-md px-5 pt-3 pb-6 space-y-3 shadow-2xl">
+            <nav className="flex flex-col gap-1.5" aria-label="Menu mobilne start">
+              <NavLink
+                to="/app/client"
+                onClick={closeMobile}
+                className="flex items-center min-h-[44px] px-4 py-2.5 rounded-xl text-base font-semibold text-white hover:bg-white/10 active:bg-white/15 transition-colors"
+              >
+                Terminy
+              </NavLink>
+              <NavLink
+                to="/instructors"
+                onClick={closeMobile}
+                className="flex items-center min-h-[44px] px-4 py-2.5 rounded-xl text-base font-semibold text-white hover:bg-white/10 active:bg-white/15 transition-colors"
+              >
+                Instruktorzy
+              </NavLink>
+            </nav>
+
+            <div className="pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  closeMobile();
+                  handleLogin();
+                }}
+                className="w-full inline-flex items-center justify-center min-h-[46px] px-4 py-2.5 text-base font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-lg transition-colors"
+              >
+                Zaloguj do panelu
+              </button>
+            </div>
+          </div>
+        )}
       </header>
     );
   }
 
+  // Standardowa nawigacja dla zalogowanych oraz na podstronach aplikacji
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[60px] sm:min-h-[68px] flex items-center justify-between gap-3">
@@ -189,32 +247,19 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => logout()}
-                className="inline-flex items-center justify-center gap-1.5 min-h-[42px] px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 rounded-lg shadow-sm transition-colors"
+                className="inline-flex items-center justify-center min-h-[40px] px-3.5 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 rounded-lg shadow-sm transition-colors"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden lg:inline">Wyloguj</span>
+                Wyloguj
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => login()}
-                className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 rounded-lg shadow-sm transition-colors"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Zaloguj się</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleRegister}
-                className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Zarejestruj się</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleLogin}
+              className="inline-flex items-center justify-center min-h-[40px] px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm transition-colors whitespace-nowrap"
+            >
+              Zaloguj do panelu
+            </button>
           )}
         </div>
 
@@ -236,7 +281,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Wysuwane menu mobilne (< 768px) */}
+      {/* Wysuwane menu mobilne na podstronach (< 768px) */}
       {mobileOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-4 space-y-3 shadow-lg">
           <nav className="flex flex-col gap-1" aria-label="Menu mobilne">
@@ -278,38 +323,22 @@ export default function Navbar() {
                     closeMobile();
                     logout();
                   }}
-                  className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-base font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:bg-slate-100 rounded-lg shadow-sm"
+                  className="w-full inline-flex items-center justify-center min-h-[44px] px-4 py-2.5 text-base font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:bg-slate-100 rounded-lg shadow-sm"
                 >
-                  <LogOut className="w-4 h-4" />
-                  <span>Wyloguj</span>
+                  Wyloguj
                 </button>
               </div>
             ) : (
-              <div className="space-y-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeMobile();
-                    login();
-                  }}
-                  className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-base font-semibold text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 rounded-lg shadow-sm"
-                >
-                  <LogIn className="w-4 h-4" />
-                  <span>Zaloguj się</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeMobile();
-                    handleRegister();
-                  }}
-                  className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-base font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-colors"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Zarejestruj się</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  closeMobile();
+                  handleLogin();
+                }}
+                className="w-full inline-flex items-center justify-center min-h-[44px] px-4 py-2.5 text-base font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-sm transition-colors"
+              >
+                Zaloguj do panelu
+              </button>
             )}
           </div>
         </div>

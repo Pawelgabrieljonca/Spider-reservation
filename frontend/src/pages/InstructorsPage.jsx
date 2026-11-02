@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Award, Calendar, Search } from 'lucide-react';
 import apiClient from '../api/client';
-import { useAuth } from '../auth/useAuth';
 import { BTN_PRIMARY, CARD_CLASS, INPUT_CLASS, SELECT_CLASS } from '../styles/ui';
 
 const BASE_INSTRUCTORS = [
@@ -107,18 +106,13 @@ function InstructorAvatar({ src, name }) {
 
 export default function InstructorsPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, hasRole } = useAuth();
-
   const [searchQuery, setSearchQuery] = useState('');
   const [specFilter, setSpecFilter] = useState('ALL');
   const [slotCountsByInstructor, setSlotCountsByInstructor] = useState({});
 
-  const isClient = isAuthenticated && hasRole('ROLE_CLIENT');
-
-  // Jeśli użytkownik jest zalogowanym klientem, pobieramy w tle wolne terminy,
-  // aby pokazać realną dostępność i ewentualnych dodatkowych instruktorów z bazy danych.
+  // Pobieramy w tle aktualne wolne terminy, aby pokazać liczbę dostępnych slotów
+  // oraz ewentualnych instruktorów dodanych w bazie danych (widok dostępny również dla gości).
   useEffect(() => {
-    if (!isClient) return undefined;
     let active = true;
 
     const dateTo = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString();
@@ -135,13 +129,13 @@ export default function InstructorsPage() {
         setSlotCountsByInstructor(counts);
       })
       .catch(() => {
-        // Widok publiczny działa niezawodnie również bez odpowiedzi API
+        // Widok publiczny działa niezawodnie również w przypadku braku połączenia
       });
 
     return () => {
       active = false;
     };
-  }, [isClient]);
+  }, []);
 
   const allInstructors = useMemo(() => {
     const knownNames = new Set(BASE_INSTRUCTORS.map((i) => i.name.toLowerCase()));
