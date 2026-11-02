@@ -403,3 +403,38 @@ def cancel_reservation(
         )
 
     return reservation
+
+def update_reservation_equipment(
+    session: Session,
+    *,
+    reservation_id: int,
+    client_id: int,
+    needs_equipment: bool,
+    now: datetime | None = None,
+) -> Reservation:
+    """Zmiana zapotrzebowania na sprzęt (buty + uprząż) bez anulowania rezerwacji.
+
+    Dozwolona tylko dla własnej, aktywnej rezerwacji, której termin jeszcze się nie rozpoczął.
+    """
+    now_utc = _ensure_utc(now or _utcnow())
+    try:
+        reservation = session.execute(
+            select(Reservation)
+            .where(Reservation.id == reservation_id)
+            .options(joinedload(Reservation.slot).joinedload(TrainingSlot.instructor))
+            .with_for_update(of=Reservation)
+        ).scalar_one_or_none()
+
+        if reservation is None or reservation.client_id != client_id:
+            raise NotFoundError("Rezerwacja nie istnieje.")
+        if reservation.status == ReservationStatus.CANCELLED:
+            raise AlreadyCancelledError()
+        if _ensure_utc(reservation.slot.start_time) <= now_utc:
+            raise SlotUnavailableError("Trening już się rozpoczął – nie można zmienić sprzętu.")
+
+        reservation.needs_equipment = needs_equipment
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return reservation

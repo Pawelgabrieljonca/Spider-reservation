@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Award, Calendar, Search } from 'lucide-react';
 import apiClient from '../api/client';
+import SEO from '../components/SEO';
 import { BTN_PRIMARY, CARD_CLASS, INPUT_CLASS, SELECT_CLASS } from '../styles/ui';
 
 const BASE_INSTRUCTORS = [
@@ -177,6 +178,11 @@ export default function InstructorsPage() {
 
   return (
     <div className="space-y-6">
+      <SEO
+        title="Instruktorzy Wspinaczki | Centrum Wspinaczkowe Spider Bydgoszcz"
+        description="Poznaj certyfikowanych instruktorów wspinaczki w CW Spider Bydgoszcz. Doświadczeni trenerzy wspinaczki sportowej, boulderingu i kursów asekuracji dla początkujących i zaawansowanych."
+        path="/instructors"
+      />
       {/* Nagłówek podstrony */}
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">

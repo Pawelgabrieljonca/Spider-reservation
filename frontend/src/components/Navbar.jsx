@@ -8,7 +8,6 @@ export default function Navbar() {
   const {
     isAuthenticated,
     userProfile,
-    roles,
     login,
     logout,
     isLoading,
@@ -33,14 +32,14 @@ export default function Navbar() {
     ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim()
     : userProfile?.username || userProfile?.email || 'Użytkownik';
 
-  const roleLabels = roles
-    .filter((r) => r.startsWith('ROLE_'))
-    .map((r) => {
-      if (r === 'ROLE_ADMIN') return 'Admin';
-      if (r === 'ROLE_INSTRUCTOR') return 'Instruktor';
-      if (r === 'ROLE_CLIENT') return 'Klient';
-      return r.replace('ROLE_', '');
-    });
+  // Główna, pojedyncza rola kontekstowa do wyświetlenia w belce użytkownika (zamiast wielokrotnych "Instruktor • Klient")
+  const primaryRoleLabel = isAdmin
+    ? 'Admin'
+    : isInstructor
+    ? 'Instruktor'
+    : isClient
+    ? 'Klient'
+    : 'Użytkownik';
 
   const navItems = [];
   if (isAuthenticated && isAdmin) {
@@ -65,7 +64,7 @@ export default function Navbar() {
     );
   } else if (!isAuthenticated) {
     navItems.push(
-      { to: '/app/client', label: 'Terminy', end: true },
+      { to: '/terminy', label: 'Terminy', end: true },
       { to: '/instructors', label: 'Instruktorzy', end: false }
     );
   }
@@ -236,11 +235,9 @@ export default function Navbar() {
                   <div className="text-xs lg:text-sm font-semibold text-slate-900 truncate">
                     {displayName}
                   </div>
-                  {roleLabels.length > 0 && (
-                    <div className="text-[11px] text-emerald-700 font-medium truncate">
-                      {roleLabels.join(' • ')}
-                    </div>
-                  )}
+                  <div className="text-[11px] text-emerald-700 font-medium truncate">
+                    {primaryRoleLabel}
+                  </div>
                 </div>
               </div>
 
@@ -312,7 +309,7 @@ export default function Navbar() {
                       {displayName}
                     </div>
                     <div className="text-xs text-emerald-700 font-medium">
-                      {roleLabels.join(' • ') || 'Zalogowany użytkownik'}
+                      {primaryRoleLabel}
                     </div>
                   </div>
                 </div>

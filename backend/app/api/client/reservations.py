@@ -4,7 +4,12 @@ from flask_smorest import Blueprint
 from app.core.database import db_session
 from app.core.security import SECURITY_DOC, current_user, require_roles
 from app.models import UserRole
-from app.schemas.reservation import ReservationCreateSchema, ReservationQuerySchema, ReservationSchema
+from app.schemas.reservation import (
+    ReservationCreateSchema,
+    ReservationQuerySchema,
+    ReservationSchema,
+    ReservationUpdateSchema,
+)
 from app.services import reservation_service
 
 blp = Blueprint(
@@ -52,6 +57,21 @@ class ReservationCollection(MethodView):
 
 @blp.route("/<int:reservation_id>")
 class ReservationItem(MethodView):
+    @blp.doc(**SECURITY_DOC)
+    @require_roles(UserRole.CLIENT)
+    @blp.arguments(ReservationUpdateSchema)
+    @blp.response(200, ReservationSchema)
+    @blp.alt_response(404, description="Rezerwacja nie istnieje")
+    @blp.alt_response(409, description="Rezerwacja anulowana lub trening już się rozpoczął")
+    def patch(self, payload, reservation_id):
+        """Zmiana zapotrzebowania na sprzęt (buty + uprząż) bez anulowania rezerwacji."""
+        return reservation_service.update_reservation_equipment(
+            db_session,
+            reservation_id=reservation_id,
+            client_id=current_user().id,
+            needs_equipment=payload["needs_equipment"],
+        )
+
     @blp.doc(**SECURITY_DOC)
     @require_roles(UserRole.CLIENT)
     @blp.response(200, ReservationSchema)

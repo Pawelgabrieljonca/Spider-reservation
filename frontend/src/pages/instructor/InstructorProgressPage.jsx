@@ -14,6 +14,7 @@ import {
 import apiClient from '../../api/client';
 import GradeConverterModal from '../../components/GradeConverterModal';
 import Pagination from '../../components/Pagination';
+import SEO from '../../components/SEO';
 import {
   BTN_PRIMARY,
   BTN_SECONDARY,
@@ -188,6 +189,12 @@ export default function InstructorProgressPage() {
 
   return (
     <div className="space-y-6">
+      <SEO
+        title="Dziennik Podopiecznych | Panel Instruktora CW Spider"
+        description="Rejestracja i monitoring przejść dróg wspinaczkowych klientów Centrum Wspinaczkowego Spider."
+        path="/app/instructor/progress"
+        robots="noindex, nofollow"
+      />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
           Dziennik postępów

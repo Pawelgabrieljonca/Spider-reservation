@@ -14,6 +14,7 @@ import {
 import apiClient from '../../api/client';
 import GradeConverterModal from '../../components/GradeConverterModal';
 import Pagination from '../../components/Pagination';
+import SEO from '../../components/SEO';
 import {
   BTN_SECONDARY,
   CARD_CLASS,
@@ -34,7 +35,9 @@ export default function ClientProgressPage() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [converterOpen, setConverterOpen] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(
+    () => new URLSearchParams(window.location.search).get('q') || ''
+  );
   const [sortOrder, setSortOrder] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
@@ -106,6 +109,12 @@ export default function ClientProgressPage() {
 
   return (
     <div className="space-y-6">
+      <SEO
+        title="Dziennik Postępów Wspinaczkowych | CW Spider"
+        description="Śledź swój progres na ścianie wspinaczkowej w CW Spider Bydgoszcz. Historia pokonanych dróg, statystyki trudności i poziomy zaawansowania."
+        path="/app/client/progress"
+        robots="noindex, nofollow"
+      />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
           Dziennik postępów

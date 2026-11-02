@@ -10,6 +10,9 @@ export default function Layout({ children }) {
   const location = useLocation();
 
   const isLanding = !isAuthenticated && location.pathname === '/';
+  const isPanelRoute = location.pathname.startsWith('/app');
+  // Stopka nie jest renderowana po zalogowaniu w panelu klienta, instruktora i administratora
+  const showFooter = !isAuthenticated && (!isPanelRoute || location.pathname === '/app/client');
 
   useEffect(() => {
     if (isLanding) {
@@ -72,13 +75,22 @@ export default function Layout({ children }) {
         className={
           isLanding
             ? 'flex-1 w-full flex flex-col'
-            : 'flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6'
+            : `flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 ${
+                !showFooter ? 'pb-10 sm:pb-16' : ''
+              }`
         }
       >
         {children}
       </main>
 
-      <Footer />
+      {showFooter && <Footer />}
+
+      {!showFooter && isAuthenticated && (
+        <div className="border-t border-slate-200 bg-white/70 py-2.5 px-4 text-center text-xs text-slate-500">
+          © {new Date().getFullYear()} CW Spider Bydgoszcz · ul. Świecka 8 ·{' '}
+          <a href="tel:+48519699795" className="hover:text-slate-800">519 699 795</a>
+        </div>
+      )}
     </div>
   );
 }

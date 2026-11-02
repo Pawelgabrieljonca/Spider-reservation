@@ -1,8 +1,14 @@
 import { Link } from 'react-router-dom';
+import SEO from '../components/SEO';
 
 export default function Home() {
   return (
     <section className="relative w-full min-h-[100dvh] flex items-center justify-center overflow-hidden bg-slate-950 px-6 sm:px-12 py-20 sm:py-28">
+      <SEO
+        title="Centrum Wspinaczkowe Spider Bydgoszcz | Rezerwacja Treningów Online"
+        description="Oficjalny system rezerwacji treningów wspinaczkowych online w Centrum Wspinaczkowym Spider w Bydgoszczy. Wybierz certyfikowanego instruktora, sprawdź grafik i zarezerwuj termin."
+        path="/"
+      />
       <img
         src="/separator.webp"
         alt=""
@@ -26,7 +32,7 @@ export default function Home() {
 
         <div className="pt-2 sm:pt-4">
           <Link
-            to="/app/client"
+            to="/terminy"
             className="inline-flex items-center justify-center min-h-[52px] sm:min-h-[56px] px-8 sm:px-10 py-3.5 sm:py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-base sm:text-lg shadow-xl shadow-slate-950/60 hover:scale-[1.02] active:scale-[0.99] transition-all"
           >
             Zarezerwuj trening

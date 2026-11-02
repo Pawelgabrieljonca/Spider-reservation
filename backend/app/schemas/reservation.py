@@ -53,6 +53,14 @@ class ReservationCreateSchema(Schema):
             )
 
 
+class ReservationUpdateSchema(Schema):
+    """Edycja rezerwacji bez anulowania (np. zmiana zapotrzebowania na sprzęt)."""
+
+    needs_equipment = fields.Boolean(
+        required=True, metadata={"description": "Czy klient potrzebuje wypożyczyć buty i uprząż."}
+    )
+
+
 class ReservationQuerySchema(Schema):
     status = fields.Enum(ReservationStatus, by_value=True, load_default=None)
 
@@ -67,4 +75,10 @@ class ReservationSchema(Schema):
         lambda r: r.status == ReservationStatus.CONFIRMED and can_cancel(r.slot.start_time),
         dump_only=True,
         metadata={"description": "true, jeśli do startu zostało więcej niż 12 h i rezerwacja jest aktywna."},
+    )
+
+    slot_occupancy = fields.Function(
+        lambda r: sum(1 for x in r.slot.reservations if x.status == ReservationStatus.CONFIRMED),
+        dump_only=True,
+        metadata={"description": "Liczba potwierdzonych uczestników w tej sesji (np. 2 z 3)."},
     )

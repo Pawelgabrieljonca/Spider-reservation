@@ -17,6 +17,7 @@ import {
 import apiClient from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
 import Pagination from '../../components/Pagination';
+import SEO from '../../components/SEO';
 import { BTN_SECONDARY, CARD_CLASS, INPUT_CLASS, SELECT_CLASS } from '../../styles/ui';
 import { formatDateTime24, formatSlotRange24, slotTypeShortLabel } from '../../utils/dateUtils';
 import { extractApiError } from '../../utils/grades';
@@ -237,6 +238,12 @@ export default function AdminDashboard({ section = 'health' }) {
 
   return (
     <div className="space-y-3.5 sm:space-y-5">
+      <SEO
+        title="Panel Administratora | System CW Spider"
+        description="Panel zarządzania systemem rezerwacji, użytkownikami, rolami i infrastrukturą CW Spider."
+        path="/app/admin"
+        robots="noindex, nofollow"
+      />
       {/* Zwięzły pasek nagłówka podstrony */}
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 truncate">

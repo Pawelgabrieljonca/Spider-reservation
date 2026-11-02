@@ -8,6 +8,7 @@ import {
   Plus,
 } from 'lucide-react';
 import apiClient from '../../api/client';
+import SEO from '../../components/SEO';
 import {
   BTN_PRIMARY,
   BTN_SECONDARY,
@@ -250,6 +251,12 @@ export default function NewSlotsPage() {
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
+      <SEO
+        title="Dodaj Nowe Terminy Treningów | Panel Instruktora CW Spider"
+        description="Kreator nowych terminów treningowych i dyżurów instruktorskich na ścianie wspinaczkowej CW Spider."
+        path="/app/instructor/slots/new"
+        robots="noindex, nofollow"
+      />
       {/* Zwięzły nagłówek podstrony */}
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">

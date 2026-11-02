@@ -20,6 +20,7 @@ import {
   INPUT_CLASS,
   SELECT_CLASS,
 } from '../../styles/ui';
+import SEO from '../../components/SEO';
 import { extractApiError } from '../../utils/grades';
 
 const SHOE_SIZE_OPTIONS = [];
@@ -122,6 +123,12 @@ export default function ClientProfilePage() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
+      <SEO
+        title="Mój Profil | Centrum Wspinaczkowe Spider"
+        description="Ustawienia profilu wspinacza, dane kontaktowe i preferencje rezerwacji w systemie Centrum Wspinaczkowego Spider w Bydgoszczy."
+        path="/app/client/profile"
+        robots="noindex, nofollow"
+      />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">

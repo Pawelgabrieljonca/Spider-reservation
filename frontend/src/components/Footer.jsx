@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, X } from 'lucide-react';
-import { useAuth } from '../auth/useAuth';
 import RidgelineDitherFooter from './ui/ridgeline-dither-footer';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
 export default function Footer() {
   const [termsOpen, setTermsOpen] = useState(false);
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const handleNav = (path) => (e) => {
@@ -17,26 +15,8 @@ export default function Footer() {
   };
 
   const navLinks = [
-    { label: 'Grafik treningów', href: '/app/client', onClick: handleNav('/app/client') },
-    ...(isAuthenticated
-      ? [
-          {
-            label: 'Moje rezerwacje',
-            href: '/app/client/reservations',
-            onClick: handleNav('/app/client/reservations'),
-          },
-        ]
-      : []),
+    { label: 'Grafik treningów', href: '/terminy', onClick: handleNav('/terminy') },
     { label: 'Nasi instruktorzy', href: '/instructors', onClick: handleNav('/instructors') },
-    ...(isAuthenticated
-      ? [
-          {
-            label: 'Dziennik postępów',
-            href: '/app/client/progress',
-            onClick: handleNav('/app/client/progress'),
-          },
-        ]
-      : []),
   ];
 
   const columns = [

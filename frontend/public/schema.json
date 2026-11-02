@@ -1,0 +1,86 @@
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": ["SportsActivityLocation", "ExerciseGym", "LocalBusiness"],
+      "@id": "https://spider.bydgoszcz.pl/#location",
+      "name": "Centrum Wspinaczkowe Spider Bydgoszcz",
+      "alternateName": "CW Spider Bydgoszcz",
+      "description": "Nowoczesne centrum wspinaczkowe w Bydgoszczy – ściany z liną, strefa boulderingu, profesjonalne treningi z licencjonowanymi instruktorami wspinaczki sportowej oraz system rezerwacji online.",
+      "url": "https://spider.bydgoszcz.pl/",
+      "telephone": "+48519699795",
+      "email": "centrum.wspinaczkowe@gmail.com",
+      "logo": "https://spider.bydgoszcz.pl/logospider-dark.png",
+      "image": "https://spider.bydgoszcz.pl/separator.webp",
+      "priceRange": "$$",
+      "currenciesAccepted": "PLN",
+      "paymentAccepted": "Cash, Credit Card, BLIK",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "ul. Świecka 8 (wejście od Racławickiej)",
+        "addressLocality": "Bydgoszcz",
+        "postalCode": "85-048",
+        "addressRegion": "Kujawsko-Pomorskie",
+        "addressCountry": "PL"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 53.1325,
+        "longitude": 18.0084
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday"
+          ],
+          "opens": "10:00",
+          "closes": "22:00"
+        }
+      ],
+      "sameAs": [
+        "https://www.facebook.com/centrum.wspinaczkowe",
+        "https://www.instagram.com/cw_spider"
+      ]
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://spider.bydgoszcz.pl/#app",
+      "name": "Spider Reservation System",
+      "alternateName": "System Rezerwacji Treningów CW Spider",
+      "applicationCategory": "SportsApplication, BusinessApplication",
+      "operatingSystem": "All (Web Browser)",
+      "url": "https://spider.bydgoszcz.pl/",
+      "description": "Aplikacja internetowa do rezerwacji treningów wspinaczkowych online, grafiku instruktorów i dziennika postępów w Centrum Wspinaczkowym Spider w Bydgoszczy.",
+      "browserRequirements": "Requires JavaScript. Requires HTML5.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "PLN"
+      },
+      "featureList": [
+        "Rezerwacja treningów wspinaczkowych online",
+        "Aktualny grafik terminów i dyżurów instruktorskich",
+        "Dziennik postępów wspinaczkowych i historia przejść",
+        "Kalkulator i przelicznik wycen trudności (Francuska, Kurtyki, UIAA)"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://spider.bydgoszcz.pl/#website",
+      "url": "https://spider.bydgoszcz.pl/",
+      "name": "Centrum Wspinaczkowe Spider Bydgoszcz",
+      "publisher": {
+        "@id": "https://spider.bydgoszcz.pl/#location"
+      },
+      "inLanguage": "pl-PL"
+    }
+  ]
+}
+

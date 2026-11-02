@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
-  ArrowUpDown,
   Calendar as CalendarIcon,
   CalendarCheck,
   CheckCircle2,
@@ -12,8 +11,7 @@ import {
   Footprints,
   LogIn,
   Phone,
-  RefreshCw,
-  Search,
+  Plus,
   Sparkles,
   User,
   Users,
@@ -21,9 +19,9 @@ import {
 } from 'lucide-react';
 import apiClient from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import Pagination from '../../components/Pagination';
+import ClientReservationsView from '../../components/ClientReservationsView';
+import SEO from '../../components/SEO';
 import {
-  BTN_DANGER,
   BTN_PRIMARY,
   BTN_SECONDARY,
   CARD_CLASS,
@@ -31,9 +29,7 @@ import {
   SELECT_CLASS,
 } from '../../styles/ui';
 import {
-  formatSlotRange24,
   formatTime24,
-  slotTypeShortLabel,
   toLocalDateInputValue,
   toLocalIsoWithOffset,
 } from '../../utils/dateUtils';
@@ -160,35 +156,6 @@ function buildCalendarCells(year, monthIndex) {
   return cells;
 }
 
-function getClientReservationStatus(res, nowMs) {
-  if (res.status === 'cancelled') return 'CANCELLED';
-  const endMs = res.slot?.end_time ? new Date(res.slot.end_time).getTime() : 0;
-  if (endMs && endMs < nowMs) return 'COMPLETED';
-  return 'ACTIVE';
-}
-
-function ReservationStatusBadge({ status }) {
-  if (status === 'ACTIVE') {
-    return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200">
-        Aktywna
-      </span>
-    );
-  }
-  if (status === 'COMPLETED') {
-    return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300">
-        Zakończona
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-900 border border-red-200">
-      Anulowana
-    </span>
-  );
-}
-
 function InstructorSummaryAvatar({ name, sizeClass = 'w-14 h-14' }) {
   const [failedSrc, setFailedSrc] = useState(null);
   const normalized = (name || '').trim().toLowerCase();
@@ -268,13 +235,6 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
   // Filtr instruktora w kalendarzu oraz filtry w zakładce „Moje rezerwacje”
   const [prevInstructorUrl, setPrevInstructorUrl] = useState(instructorFromUrl);
   const [instructorFilter, setInstructorFilter] = useState(instructorFromUrl);
-
-  const [resSearchQuery, setResSearchQuery] = useState('');
-  const [resStatusFilter, setResStatusFilter] = useState('ALL');
-  const [resTypeFilter, setResTypeFilter] = useState('ALL');
-  const [resSortOrder, setResSortOrder] = useState('desc');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
 
   if (instructorFromUrl !== prevInstructorUrl) {
     setPrevInstructorUrl(instructorFromUrl);
@@ -398,6 +358,45 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
       setLoadingReservations(false);
     }
   }, [viewMonth.year, viewMonth.month, selectedServiceType, isAuthenticated]);
+
+  // Rewalidacja w tle (bez spinnerów): rezerwacje klienta i wolne terminy bieżącego miesiąca
+  const silentRefresh = useCallback(async () => {
+    try {
+      const bounds = buildMonthIsoBounds(viewMonth.year, viewMonth.month);
+      const [slotsRes, myRes] = await Promise.all([
+        apiClient.get('/api/v1/client/slots', {
+          params: {
+            date_from: bounds.date_from,
+            date_to: bounds.date_to,
+            slot_type: selectedServiceType,
+            only_free: true,
+          },
+        }),
+        isAuthenticated ? apiClient.get('/api/v1/client/reservations') : Promise.resolve(null),
+      ]);
+      setSlots(Array.isArray(slotsRes?.data) ? slotsRes.data : []);
+      if (myRes?.data) {
+        setReservations(Array.isArray(myRes.data) ? myRes.data : []);
+      }
+      setNowMs(Date.now());
+    } catch {
+      // Ciche pominięcie błędu tła – kolejna próba przy następnym cyklu
+    }
+  }, [viewMonth.year, viewMonth.month, selectedServiceType, isAuthenticated]);
+
+  useEffect(() => {
+    const revalidate = () => {
+      if (document.visibilityState === 'visible') silentRefresh();
+    };
+    const intervalId = window.setInterval(revalidate, 30000);
+    window.addEventListener('focus', revalidate);
+    document.addEventListener('visibilitychange', revalidate);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', revalidate);
+      document.removeEventListener('visibilitychange', revalidate);
+    };
+  }, [silentRefresh]);
 
   // Przedziały czasowe już potwierdzonych wizyt zalogowanego klienta (wykluczenie kolizji własnych)
   const clientReservedIntervals = useMemo(() => {
@@ -599,52 +598,37 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
     }
   };
 
+  // Potwierdzenie anulowania odbywa się w modalu widoku rezerwacji (ClientReservationsView).
   const handleCancelReservation = async (reservationId) => {
-    if (!window.confirm('Czy na pewno chcesz odwołać tę wizytę?')) return;
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
       await apiClient.delete(`/api/v1/client/reservations/${reservationId}`);
-      setSuccessMsg('Twoja rezerwacja została anulowana.');
+      setSuccessMsg('Rezerwacja odwołana. Zwolniony termin wrócił do ogólnego grafiku.');
       window.dispatchEvent(new Event('spider:notifications-refresh'));
-      await handleManualRefresh();
+      await silentRefresh();
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Nie udało się anulować rezerwacji.'));
     }
   };
 
-  // Filtrowanie i paginacja zakładki „Moje rezerwacje”
-  const filteredReservations = useMemo(() => {
-    const q = resSearchQuery.trim().toLowerCase();
-    const list = reservations.filter((res) => {
-      const computedStatus = getClientReservationStatus(res, nowMs);
-      if (resStatusFilter !== 'ALL' && computedStatus !== resStatusFilter) return false;
-      if (resTypeFilter !== 'ALL' && res.slot?.slot_type !== resTypeFilter) return false;
-      if (q && !(res.slot?.instructor_name || '').toLowerCase().includes(q)) return false;
-      return true;
-    });
-
-    list.sort((a, b) => {
-      const tA = a.slot?.start_time ? new Date(a.slot.start_time).getTime() : 0;
-      const tB = b.slot?.start_time ? new Date(b.slot.start_time).getTime() : 0;
-      const diff = tA - tB;
-      return resSortOrder === 'asc' ? diff : -diff;
-    });
-
-    return list;
-  }, [reservations, resStatusFilter, resTypeFilter, resSearchQuery, resSortOrder, nowMs]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredReservations.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedReservations = filteredReservations.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize
-  );
-
-  const activeReservationsCount = useMemo(
-    () => reservations.filter((r) => getClientReservationStatus(r, nowMs) === 'ACTIVE').length,
-    [reservations, nowMs]
-  );
+  const handleUpdateEquipment = async (reservationId, needsEquipmentValue) => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await apiClient.patch(`/api/v1/client/reservations/${reservationId}`, {
+        needs_equipment: needsEquipmentValue,
+      });
+      setSuccessMsg(
+        needsEquipmentValue
+          ? 'Zapisano: wypożyczenie butów i uprzęży na ten trening.'
+          : 'Zapisano: przychodzisz z własnym sprzętem.'
+      );
+      await silentRefresh();
+    } catch (err) {
+      setErrorMsg(extractApiError(err, 'Nie udało się zmienić zapotrzebowania na sprzęt.'));
+    }
+  };
 
   const selectedInstructorMeta = selectedSlot
     ? INSTRUCTOR_PROFILES[(selectedSlot.instructor_name || '').trim().toLowerCase()]
@@ -652,25 +636,37 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
 
   return (
     <div className={`space-y-5 ${section === 'slots' ? 'pb-28 md:pb-4' : ''}`}>
+      <SEO
+        title={
+          section === 'reservations'
+            ? 'Moje Rezerwacje | Panel Klienta CW Spider'
+            : 'Grafik Treningów i Terminy | CW Spider Bydgoszcz'
+        }
+        description={
+          section === 'reservations'
+            ? 'Zarządzaj swoimi rezerwacjami treningów wspinaczkowych w Centrum Wspinaczkowym Spider. Podgląd nadchodzących terminów i historia sesji.'
+            : 'Sprawdź aktualny grafik i wolne terminy treningów wspinaczkowych w Centrum Wspinaczkowym Spider Bydgoszcz. Wybierz datę i zarezerwuj sesję z instruktorem.'
+        }
+        path={section === 'reservations' ? '/app/client/reservations' : '/terminy'}
+        robots={section === 'reservations' ? 'noindex, nofollow' : 'index, follow'}
+      />
       {/* Zwięzły nagłówek widoku */}
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
           {section === 'reservations'
-            ? `Moje rezerwacje (${activeReservationsCount} aktywne)`
+            ? 'Moje rezerwacje'
             : 'Zarezerwuj trening'}
         </h1>
 
-        <button
-          type="button"
-          onClick={handleManualRefresh}
-          disabled={loadingSlots || loadingReservations}
-          className={BTN_SECONDARY}
-        >
-          <RefreshCw
-            className={`w-4 h-4 ${loadingSlots || loadingReservations ? 'animate-spin' : ''}`}
-          />
-          <span className="hidden sm:inline">Odśwież</span>
-        </button>
+        {section === 'reservations' && (
+          <Link to="/app/client" className={BTN_PRIMARY}>
+            <Plus className="w-4 h-4" />
+            <span>
+              <span className="hidden sm:inline">Zarezerwuj kolejny trening</span>
+              <span className="sm:hidden">Zarezerwuj</span>
+            </span>
+          </Link>
+        )}
       </div>
 
       {/* Komunikaty błędów / sukcesu */}
@@ -1263,253 +1259,14 @@ export default function ClientSchedulePage({ mode = 'slots' }) {
           WIDOK 2: MOJE REZERWACJE
          ======================================================================= */}
       {section === 'reservations' && (
-        <>
-          <section className={`${CARD_CLASS} p-5 space-y-4`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label
-                  htmlFor="res-search"
-                  className="block text-sm font-medium text-slate-700 mb-1.5"
-                >
-                  Szukaj instruktora
-                </label>
-                <div className="relative">
-                  <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    id="res-search"
-                    type="search"
-                    value={resSearchQuery}
-                    onChange={(e) => {
-                      setResSearchQuery(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    placeholder="Imię lub nazwisko..."
-                    className={`${INPUT_CLASS} pl-11`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="res-status-filter"
-                  className="block text-sm font-medium text-slate-700 mb-1.5"
-                >
-                  Status rezerwacji
-                </label>
-                <select
-                  id="res-status-filter"
-                  value={resStatusFilter}
-                  onChange={(e) => {
-                    setResStatusFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className={SELECT_CLASS}
-                >
-                  <option value="ALL">Wszystkie statusy</option>
-                  <option value="ACTIVE">Aktywne</option>
-                  <option value="CANCELLED">Anulowane</option>
-                  <option value="COMPLETED">Zakończone</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="res-type-filter"
-                  className="block text-sm font-medium text-slate-700 mb-1.5"
-                >
-                  Typ zajęć
-                </label>
-                <select
-                  id="res-type-filter"
-                  value={resTypeFilter}
-                  onChange={(e) => {
-                    setResTypeFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className={SELECT_CLASS}
-                >
-                  <option value="ALL">Wszystkie typy</option>
-                  <option value="INDIVIDUAL_1H">1h – Personalny</option>
-                  <option value="GROUP_1_5H">1.5h – Grupowy</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="res-sort-order"
-                  className="block text-sm font-medium text-slate-700 mb-1.5"
-                >
-                  Sortowanie po dacie
-                </label>
-                <div className="relative">
-                  <ArrowUpDown className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <select
-                    id="res-sort-order"
-                    value={resSortOrder}
-                    onChange={(e) => {
-                      setResSortOrder(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className={`${SELECT_CLASS} pl-10`}
-                  >
-                    <option value="desc">Od najnowszych</option>
-                    <option value="asc">Od najstarszych</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <div className="bg-sky-50 border border-sky-200 text-sky-900 rounded-xl px-4 py-3.5 flex items-start gap-3 text-sm sm:text-base">
-            <Clock className="w-5 h-5 text-sky-700 shrink-0 mt-0.5" />
-            <span>
-              <strong>Zasada anulowania 12h:</strong> Bezpłatne odwołanie rezerwacji jest dostępne
-              do 12 godzin przed planowanym rozpoczęciem treningu.
-            </span>
-          </div>
-
-          {paginatedReservations.length === 0 ? (
-            <div className={`${CARD_CLASS} p-10 text-center space-y-3`}>
-              <p className="text-lg font-semibold text-slate-800">
-                Brak rezerwacji spełniających wybrane kryteria
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/app/client')}
-                className={BTN_PRIMARY}
-              >
-                Przejdź do kalendarza rezerwacji
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className={`hidden md:block ${CARD_CLASS} overflow-hidden`}>
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-600">
-                    <tr>
-                      <th className="py-3.5 px-5">Termin zajęć (24h)</th>
-                      <th className="py-3.5 px-4">Instruktor i usługa</th>
-                      <th className="py-3.5 px-4">Sprzęt</th>
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-5 text-right">Akcja</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-sm sm:text-base">
-                    {paginatedReservations.map((res) => {
-                      const status = getClientReservationStatus(res, nowMs);
-                      return (
-                        <tr key={res.id} className="hover:bg-slate-50/80">
-                          <td className="py-4 px-5 font-semibold text-slate-900 whitespace-nowrap">
-                            <div>
-                              {formatSlotRange24(res.slot?.start_time, res.slot?.end_time)}
-                            </div>
-                            <div className="text-xs font-mono text-slate-400">
-                              Rezerwacja #{res.id}
-                            </div>
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="font-semibold text-slate-900">
-                              {res.slot?.instructor_name || '—'}
-                            </div>
-                            <div className="text-xs text-slate-600 mt-0.5">
-                              {slotTypeShortLabel(res.slot?.slot_type)}
-                            </div>
-                          </td>
-                          <td className="py-4 px-4 text-sm">
-                            {res.needs_equipment ? (
-                              <span className="font-semibold text-amber-900 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-md text-xs">
-                                Wypożyczenie
-                              </span>
-                            ) : (
-                              <span className="text-slate-600">Własny</span>
-                            )}
-                          </td>
-                          <td className="py-4 px-4">
-                            <ReservationStatusBadge status={status} />
-                          </td>
-                          <td className="py-4 px-5 text-right">
-                            {status === 'ACTIVE' ? (
-                              res.can_cancel ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCancelReservation(res.id)}
-                                  className={BTN_DANGER}
-                                >
-                                  Odwołaj wizytę
-                                </button>
-                              ) : (
-                                <span
-                                  title="Do rozpoczęcia zajęć pozostało mniej niż 12 godzin"
-                                  className="text-xs font-medium text-slate-400 italic"
-                                >
-                                  Mniej niż 12h do startu
-                                </span>
-                              )
-                            ) : (
-                              <span className="text-slate-400 text-sm">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="md:hidden space-y-4">
-                {paginatedReservations.map((res) => {
-                  const status = getClientReservationStatus(res, nowMs);
-                  return (
-                    <div key={res.id} className={`${CARD_CLASS} p-4 space-y-3`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="text-base font-bold text-slate-900">
-                            {formatSlotRange24(res.slot?.start_time, res.slot?.end_time)}
-                          </div>
-                          <div className="text-sm text-slate-600 mt-0.5">
-                            Instruktor: <strong>{res.slot?.instructor_name || '—'}</strong>
-                          </div>
-                        </div>
-                        <ReservationStatusBadge status={status} />
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm text-slate-600 pt-2 border-t border-slate-100">
-                        <span>{slotTypeShortLabel(res.slot?.slot_type)}</span>
-                        <span>
-                          Sprzęt:{' '}
-                          <strong>{res.needs_equipment ? 'Wypożyczenie' : 'Własny'}</strong>
-                        </span>
-                      </div>
-
-                      {status === 'ACTIVE' &&
-                        (res.can_cancel ? (
-                          <button
-                            type="button"
-                            onClick={() => handleCancelReservation(res.id)}
-                            className={`${BTN_DANGER} w-full`}
-                          >
-                            Odwołaj wizytę
-                          </button>
-                        ) : (
-                          <div className="text-xs text-center text-slate-500 bg-slate-50 rounded-lg py-2 px-3">
-                            Odwołanie zablokowane (pozostało mniej niż 12h do zajęć)
-                          </div>
-                        ))}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <Pagination
-                totalItems={filteredReservations.length}
-                pageSize={pageSize}
-                currentPage={safePage}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={setPageSize}
-              />
-            </>
-          )}
-        </>
+        <ClientReservationsView
+          reservations={reservations}
+          loading={loadingReservations}
+          nowMs={nowMs}
+          Avatar={InstructorSummaryAvatar}
+          onCancel={handleCancelReservation}
+          onUpdateEquipment={handleUpdateEquipment}
+        />
       )}
 
       {/* =======================================================================
