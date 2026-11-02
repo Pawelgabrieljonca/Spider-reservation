@@ -30,10 +30,10 @@ function RootEntry() {
 
   if (isLoading) {
     return (
-      <div className="py-12 flex justify-center">
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-8 py-6 text-center max-w-md w-full">
-          <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-base font-medium text-slate-700">Inicjalizacja sesji...</p>
+      <div className="min-h-screen w-full bg-slate-900 flex items-center justify-center px-6">
+        <div className="text-center space-y-3">
+          <div className="w-9 h-9 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm font-medium text-slate-300">Inicjalizacja sesji...</p>
         </div>
       </div>
     );

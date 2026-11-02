@@ -1,20 +1,30 @@
 import { AlertTriangle, LogIn, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import Footer from './Footer';
 import Navbar from './Navbar';
 
 export default function Layout({ children }) {
   const { sessionExpiredNotice, clearSessionExpiredNotice, login, isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  const isLanding = !isAuthenticated && location.pathname === '/';
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900">
+    <div className="relative flex flex-col min-h-screen bg-slate-50 text-slate-900">
       <Navbar />
 
       {!isAuthenticated && sessionExpiredNotice && (
-        <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 pt-5">
+        <div
+          className={
+            isLanding
+              ? 'fixed bottom-6 inset-x-4 z-50 max-w-2xl mx-auto'
+              : 'max-w-6xl w-full mx-auto px-4 sm:px-6 pt-5'
+          }
+        >
           <div
             role="alert"
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-amber-50 border border-amber-300 text-amber-950 rounded-xl px-4 sm:px-5 py-4 shadow-sm"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-amber-50 border border-amber-300 text-amber-950 rounded-xl px-4 sm:px-5 py-4 shadow-lg"
           >
             <div className="flex items-start sm:items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
@@ -42,7 +52,13 @@ export default function Layout({ children }) {
         </div>
       )}
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      <main
+        className={
+          isLanding
+            ? 'flex-1 w-full flex flex-col'
+            : 'flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6'
+        }
+      >
         {children}
       </main>
       <Footer />

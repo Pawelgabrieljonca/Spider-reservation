@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import { LogIn, LogOut, Menu, Mountain, User, UserPlus, X } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { LogIn, LogOut, Menu, User, UserPlus, X } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import NotificationBell from './NotificationBell';
 
@@ -17,6 +17,9 @@ export default function Navbar() {
     clearSessionExpiredNotice,
   } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  const isLanding = !isAuthenticated && location.pathname === '/';
 
   const handleRegister = () => {
     clearSessionExpiredNotice?.();
@@ -41,21 +44,19 @@ export default function Navbar() {
     });
 
   const navItems = [];
-  if (!isAuthenticated) {
-    navItems.push({ to: '/', label: 'Start', end: true });
-  } else if (isAdmin) {
+  if (isAuthenticated && isAdmin) {
     navItems.push(
       { to: '/app/admin', label: 'Stan systemu', end: true },
       { to: '/app/admin/users', label: 'Baza użytkowników', end: false },
       { to: '/app/admin/availability', label: 'Godziny instruktorów', end: false }
     );
-  } else if (isInstructor) {
+  } else if (isAuthenticated && isInstructor) {
     navItems.push(
       { to: '/app/instructor', label: 'Grafik', end: true },
       { to: '/app/instructor/slots/new', label: 'Dodaj dyżur', end: false },
       { to: '/app/instructor/progress', label: 'Dziennik postępów', end: false }
     );
-  } else if (isClient) {
+  } else if (isAuthenticated && isClient) {
     navItems.push(
       { to: '/app/client', label: 'Terminy', end: true },
       { to: '/app/client/reservations', label: 'Moje rezerwacje', end: false },
@@ -81,6 +82,54 @@ export default function Navbar() {
 
   const closeMobile = () => setMobileOpen(false);
 
+  if (isLanding) {
+    return (
+      <header className="absolute top-0 inset-x-0 z-40">
+        <div className="max-w-7xl mx-auto px-5 sm:px-10 lg:px-14 py-6 sm:py-8 flex items-center justify-between gap-4">
+          <NavLink
+            to="/"
+            className="inline-flex items-center shrink-0 focus:outline-none"
+            aria-label="Centrum Wspinaczkowe Spider — strona główna"
+          >
+            <img
+              src="/logospider.png"
+              alt="Centrum Wspinaczkowe Spider"
+              className="h-12 sm:h-20 md:h-24 w-auto object-contain drop-shadow-md"
+            />
+          </NavLink>
+
+          <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+            {isLoading ? (
+              <span className="text-xs sm:text-sm text-white/80 px-3 py-2">
+                Weryfikacja sesji...
+              </span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => login()}
+                  className="inline-flex items-center justify-center gap-2 min-h-[42px] sm:min-h-[46px] px-3.5 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white bg-white/10 hover:bg-white/20 active:bg-white/25 border border-white/40 backdrop-blur-sm rounded-xl transition-colors"
+                >
+                  <LogIn className="w-4 h-4 hidden sm:inline" />
+                  <span>Zaloguj się</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRegister}
+                  className="inline-flex items-center justify-center gap-2 min-h-[42px] sm:min-h-[46px] px-3.5 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl shadow-lg shadow-slate-950/30 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-colors"
+                >
+                  <UserPlus className="w-4 h-4 hidden sm:inline" />
+                  <span>Zarejestruj się</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[60px] sm:min-h-[68px] flex items-center justify-between gap-3">
@@ -89,19 +138,14 @@ export default function Navbar() {
           <NavLink
             to="/"
             onClick={closeMobile}
-            className="flex items-center gap-2.5 min-h-[44px] shrink-0 group focus:outline-none"
+            className="flex items-center min-h-[44px] shrink-0 group focus:outline-none"
+            aria-label="Centrum Wspinaczkowe Spider"
           >
-            <div className="w-9 h-9 rounded-lg bg-slate-900 text-emerald-400 flex items-center justify-center shadow-sm group-hover:bg-slate-800 transition-colors">
-              <Mountain className="w-5 h-5" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold tracking-tight text-slate-900 text-base sm:text-lg leading-none">
-                CW SPIDER
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium tracking-wide mt-0.5 hidden xl:inline">
-                Centrum Wspinaczkowe Bydgoszcz
-              </span>
-            </div>
+            <img
+              src="/logospider.png"
+              alt="Centrum Wspinaczkowe Spider"
+              className="h-12 sm:h-14 -my-1.5 w-auto object-contain brightness-0 shrink-0"
+            />
           </NavLink>
 
           <nav className="hidden md:flex items-center gap-1" aria-label="Główna nawigacja">
