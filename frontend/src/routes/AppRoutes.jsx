@@ -12,7 +12,6 @@ const ClientProgressPage = lazy(() => import('../pages/client/ClientProgressPage
 const ClientSchedulePage = lazy(() => import('../pages/client/ClientSchedulePage'));
 const InstructorProgressPage = lazy(() => import('../pages/instructor/InstructorProgressPage'));
 const InstructorSchedulePage = lazy(() => import('../pages/instructor/InstructorSchedulePage'));
-const NewSlotsPage = lazy(() => import('../pages/instructor/NewSlotsPage'));
 
 function PageFallback() {
   return (
@@ -128,9 +127,7 @@ export default function AppRoutes() {
           <Route
             path="/app/instructor/slots/new"
             element={
-              <ProtectedRoute requiredRole="ROLE_INSTRUCTOR">
-                <NewSlotsPage />
-              </ProtectedRoute>
+              <Navigate to="/app/instructor?add=1" replace />
             }
           />
           <Route

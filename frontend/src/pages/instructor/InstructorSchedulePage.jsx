@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
+  CalendarClock,
+  CheckCheck,
   CheckCircle2,
   Clock,
   Lock,
-  RefreshCw,
+  Plus,
   Trash2,
   TrendingUp,
   Unlock,
+  Users,
   X,
 } from 'lucide-react';
 import apiClient from '../../api/client';
+import CreateShiftModal from '../../components/CreateShiftModal';
 import InstructorWeekTimeline from '../../components/InstructorWeekTimeline';
 import SEO from '../../components/SEO';
-import { BTN_DANGER, BTN_SECONDARY } from '../../styles/ui';
+import { BTN_DANGER, BTN_PRIMARY, BTN_SECONDARY } from '../../styles/ui';
 import {
   experienceLevelLabel,
   formatDurationMinutes,
@@ -23,6 +27,18 @@ import {
   slotTypeShortLabel,
 } from '../../utils/dateUtils';
 import { extractApiError } from '../../utils/grades';
+
+// Domyślne ustawienia kreatora dyżuru otwieranego przyciskiem (najbliższa pełna godzina w godz. otwarcia)
+function defaultCreateState() {
+  const now = new Date();
+  let hour = now.getHours() + 1;
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (hour > 20) {
+    date.setDate(date.getDate() + 1);
+    hour = 14;
+  }
+  return { date, hour: Math.max(9, hour) };
+}
 
 function computeReservationStatus(res, slotEndTime, nowMs) {
   if (res.status === 'cancelled') return 'CANCELLED';
@@ -61,23 +77,29 @@ function StatusBadge({ status }) {
 }
 
 export default function InstructorSchedulePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [slots, setSlots] = useState([]);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [kpiFilter, setKpiFilter] = useState(null); // 'upcoming' | 'booked' | 'completed' | null
+  const [createState, setCreateState] = useState(() =>
+    searchParams.get('add') ? defaultCreateState() : null
+  );
+
+  // Parametr ?add=1 (np. ze starego linku „Dodaj dyżur”) otwiera kreator i jest od razu czyszczony
+  useEffect(() => {
+    if (searchParams.get('add')) setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchSlots = useCallback(async () => {
-    setLoading(true);
     try {
       const res = await apiClient.get('/api/v1/instructor/slots');
       setSlots(Array.isArray(res.data) ? res.data : []);
       setNowMs(Date.now());
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Błąd pobierania grafiku instruktora.'));
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -93,16 +115,13 @@ export default function InstructorSchedulePage() {
       .catch((err) => {
         if (!active) return;
         setErrorMsg(extractApiError(err, 'Błąd pobierania grafiku instruktora.'));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
   }, []);
 
-  // Automatyczna rewalidacja w tle przy powrocie do karty
+  // Automatyczna rewalidacja w tle: powrót do karty oraz cykliczne odświeżanie co 60 s
   useEffect(() => {
     const handleRevalidate = () => {
       if (document.visibilityState === 'visible') {
@@ -117,11 +136,28 @@ export default function InstructorSchedulePage() {
     };
     window.addEventListener('focus', handleRevalidate);
     document.addEventListener('visibilitychange', handleRevalidate);
+    const intervalId = window.setInterval(handleRevalidate, 60000);
     return () => {
       window.removeEventListener('focus', handleRevalidate);
       document.removeEventListener('visibilitychange', handleRevalidate);
+      window.clearInterval(intervalId);
     };
   }, []);
+
+  const handleShiftsCreated = ({ createdCount, failedCount, start, end }) => {
+    setCreateState(null);
+    setErrorMsg(null);
+    if (createdCount === 1) {
+      setSuccessMsg(`Dodano dyżur: ${formatSlotRange24(start, end)}.`);
+    } else {
+      setSuccessMsg(
+        `Dodano ${createdCount} dyżurów (od ${formatSlotRange24(start, end)})${
+          failedCount > 0 ? `; pominięto ${failedCount} z powodu kolizji z grafikiem` : ''
+        }.`
+      );
+    }
+    fetchSlots();
+  };
 
   const handleToggleBlock = async (slot) => {
     setErrorMsg(null);
@@ -200,40 +236,89 @@ export default function InstructorSchedulePage() {
         robots="noindex, nofollow"
       />
 
-      {/* Pasek nagłówka z tytułem oraz przyciskiem Odśwież */}
-      <div className="flex items-center justify-between gap-3">
+      {/* Pasek nagłówka z tytułem oraz główną akcją */}
+      <div className="flex items-center justify-between gap-2.5 sm:gap-3">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
           Grafik dyżurów
         </h1>
 
         <button
           type="button"
-          onClick={fetchSlots}
-          disabled={loading}
-          aria-label="Odśwież grafik"
-          className="inline-flex items-center justify-center gap-1.5 min-h-[38px] px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs sm:text-sm font-medium hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm"
+          onClick={() => setCreateState(defaultCreateState())}
+          className={`${BTN_PRIMARY} px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-base shrink-0`}
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Odśwież</span>
+          <Plus className="w-4 h-4" />
+          <span>Dodaj dyżur</span>
         </button>
       </div>
 
-      {/* Zwarty, jednolinijkowy pasek statystyk */}
-      <div className="grid grid-cols-3 divide-x divide-slate-200 bg-white border border-slate-200 rounded-lg py-2 px-1 shadow-sm text-center">
-        <div className="px-1.5 text-[11px] sm:text-sm text-slate-600 truncate">
-          <span className="sm:hidden">Dyżury: </span>
-          <span className="hidden sm:inline">Nadchodzące dyżury: </span>
-          <strong className="font-bold text-emerald-700">{stats.upcomingSlots}</strong>
-        </div>
-        <div className="px-1.5 text-[11px] sm:text-sm text-slate-600 truncate">
-          <span className="sm:hidden">Rezerwacje: </span>
-          <span className="hidden sm:inline">Aktywne rezerwacje: </span>
-          <strong className="font-bold text-sky-700">{stats.activeReservations}</strong>
-        </div>
-        <div className="px-1.5 text-[11px] sm:text-sm text-slate-600 truncate">
-          <span>Zakończone: </span>
-          <strong className="font-bold text-slate-900">{stats.completedSlots}</strong>
-        </div>
+      {/* Klikalne karty KPI – filtrują/podświetlają bloki w kalendarzu (responsywne dla małych ekranów) */}
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-3" role="group" aria-label="Filtr kalendarza">
+        {[
+          {
+            key: 'upcoming',
+            icon: CalendarClock,
+            label: 'Nadchodzące dyżury',
+            short: 'Dyżury',
+            value: stats.upcomingSlots,
+            tone: 'text-emerald-700 bg-emerald-100',
+            ring: 'ring-emerald-500 border-emerald-500',
+          },
+          {
+            key: 'booked',
+            icon: Users,
+            label: 'Aktywne rezerwacje',
+            short: 'Rezerwacje',
+            value: stats.activeReservations,
+            tone: 'text-sky-700 bg-sky-100',
+            ring: 'ring-sky-500 border-sky-500',
+          },
+          {
+            key: 'completed',
+            icon: CheckCheck,
+            label: 'Zakończone',
+            short: 'Zakończone',
+            value: stats.completedSlots,
+            tone: 'text-slate-700 bg-slate-200',
+            ring: 'ring-slate-500 border-slate-500',
+          },
+        ].map((card) => {
+          const Icon = card.icon;
+          const active = kpiFilter === card.key;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setKpiFilter(active ? null : card.key)}
+              title={
+                active
+                  ? 'Kliknij ponownie, aby wyłączyć podświetlenie'
+                  : 'Kliknij, aby podświetlić w kalendarzu'
+              }
+              className={`text-center sm:text-left bg-white border rounded-xl p-2 sm:p-3.5 shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                active ? `ring-2 ${card.ring}` : 'border-slate-200'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2.5">
+                <span
+                  className={`hidden sm:inline-flex w-9 h-9 rounded-lg items-center justify-center shrink-0 ${card.tone}`}
+                >
+                  <Icon className="w-5 h-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-lg sm:text-2xl font-extrabold text-slate-900 leading-none">
+                    {card.value}
+                  </div>
+                  <div className="text-[10px] sm:text-xs font-semibold text-slate-600 truncate mt-1">
+                    <span className="sm:hidden">{card.short}</span>
+                    <span className="hidden sm:inline">{card.label}</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Komunikaty */}
@@ -411,7 +496,18 @@ export default function InstructorSchedulePage() {
         nowMs={nowMs}
         selectedSlotId={selectedSlotId}
         onSelectSlot={setSelectedSlotId}
+        highlightFilter={kpiFilter}
+        onRequestCreate={({ dayDate, hour }) => setCreateState({ date: dayDate, hour })}
       />
+
+      {createState && (
+        <CreateShiftModal
+          initialDate={createState.date}
+          initialHour={createState.hour}
+          onClose={() => setCreateState(null)}
+          onCreated={handleShiftsCreated}
+        />
+      )}
     </div>
   );
 }

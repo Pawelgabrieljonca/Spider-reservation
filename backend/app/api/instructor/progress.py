@@ -4,7 +4,11 @@ from flask_smorest import Blueprint
 from app.core.database import db_session
 from app.core.security import SECURITY_DOC, current_user, require_roles
 from app.models import UserRole
-from app.schemas.progress import ProgressEntryCreateSchema, ProgressEntrySchema
+from app.schemas.progress import (
+    ProgressEntryCreateSchema,
+    ProgressEntrySchema,
+    ProgressEntryUpdateSchema,
+)
 from app.services import progress_service
 
 blp = Blueprint(
@@ -44,6 +48,38 @@ class InstructorProgressCollection(MethodView):
             instructor_feedback=payload["instructor_feedback"],
             route_name=payload.get("route_name"),
         )
+
+
+@blp.route("/<int:entry_id>")
+class InstructorProgressItem(MethodView):
+    @blp.doc(**SECURITY_DOC)
+    @require_roles(UserRole.INSTRUCTOR)
+    @blp.arguments(ProgressEntryUpdateSchema)
+    @blp.response(200, ProgressEntrySchema)
+    @blp.alt_response(403, description="Wpis należy do innego instruktora")
+    @blp.alt_response(404, description="Wpis nie istnieje")
+    def patch(self, payload, entry_id):
+        """Edycja własnego wpisu (wycena, nazwa drogi, notatka)."""
+        return progress_service.update_progress_entry(
+            db_session,
+            entry_id=entry_id,
+            instructor_id=current_user().id,
+            changes=payload,
+        )
+
+    @blp.doc(**SECURITY_DOC)
+    @require_roles(UserRole.INSTRUCTOR)
+    @blp.response(204)
+    @blp.alt_response(403, description="Wpis należy do innego instruktora")
+    @blp.alt_response(404, description="Wpis nie istnieje")
+    def delete(self, entry_id):
+        """Usunięcie własnego wpisu z Dziennika postępów."""
+        progress_service.delete_progress_entry(
+            db_session,
+            entry_id=entry_id,
+            instructor_id=current_user().id,
+        )
+        return None
 
 
 @blp.route("/client/<int:client_id>")

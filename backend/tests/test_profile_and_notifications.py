@@ -167,6 +167,63 @@ class ProfileAndNotificationsIntegrationTests(unittest.TestCase):
                 },
             )
             self.assertEqual(r_prog.status_code, 201)
+            entry_id = r_prog.get_json()["id"]
+
+            # 5b. CRUD dziennika: edycja literówki / wyceny przez autora, 403 dla innego instruktora
+            r_edit = client.patch(
+                f"/api/v1/instructor/progress/{entry_id}",
+                headers=auth("inst-1"),
+                json={"grade": "VI.2", "instructor_feedback": "Świetna praca nóg – poprawiono."},
+            )
+            self.assertEqual(r_edit.status_code, 200)
+            self.assertEqual(r_edit.get_json()["grade"], "VI.2")
+            self.assertEqual(r_edit.get_json()["route_name"], "Zacięcie Pająka")
+            self.assertEqual(
+                client.patch(
+                    f"/api/v1/instructor/progress/{entry_id}",
+                    headers=auth("inst-1"),
+                    json={"grade": "9z"},
+                ).status_code,
+                422,
+            )
+            self.assertEqual(
+                client.patch(
+                    f"/api/v1/instructor/progress/{entry_id}", headers=auth("inst-1"), json={}
+                ).status_code,
+                422,
+            )
+            self.assertEqual(
+                client.patch(
+                    "/api/v1/instructor/progress/99999",
+                    headers=auth("inst-1"),
+                    json={"grade": "V"},
+                ).status_code,
+                404,
+            )
+            r_tmp = client.post(
+                "/api/v1/instructor/progress",
+                headers=auth("inst-1"),
+                json={
+                    "client_id": client_a_id,
+                    "grade": "V",
+                    "instructor_feedback": "Wpis do usunięcia.",
+                },
+            )
+            tmp_id = r_tmp.get_json()["id"]
+            self.assertEqual(
+                client.delete(
+                    f"/api/v1/instructor/progress/{tmp_id}", headers=auth("client-a")
+                ).status_code,
+                403,
+            )
+            self.assertEqual(
+                client.delete(
+                    f"/api/v1/instructor/progress/{tmp_id}", headers=auth("inst-1")
+                ).status_code,
+                204,
+            )
+            remaining = client.get("/api/v1/instructor/progress", headers=auth("inst-1")).get_json()
+            self.assertEqual([e["id"] for e in remaining], [entry_id])
 
             cli_a_notifs = client.get("/api/v1/notifications", headers=auth("client-a")).get_json()
             categories_cli_a = {n["category"] for n in cli_a_notifs["items"]}

@@ -51,7 +51,6 @@ export default function Navbar() {
   } else if (isAuthenticated && isInstructor) {
     navItems.push(
       { to: '/app/instructor', label: 'Grafik', end: true },
-      { to: '/app/instructor/slots/new', label: 'Dodaj dyżur', end: false },
       { to: '/app/instructor/progress', label: 'Dziennik postępów', end: false }
     );
   } else if (isAuthenticated && isClient) {

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models import ProgressEntry, Reservation, ReservationStatus, TrainingSlot, User, UserRole
 from app.services import in_app_notification_service
-from app.services.exceptions import ClientNotFoundError, ForbiddenError
+from app.services.exceptions import ClientNotFoundError, ForbiddenError, NotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +141,49 @@ def create_progress_entry(
         .where(ProgressEntry.id == entry.id)
         .options(joinedload(ProgressEntry.instructor), joinedload(ProgressEntry.client))
     ).one()
+
+
+def _get_own_entry(session: Session, *, entry_id: int, instructor_id: int) -> ProgressEntry:
+    """Zwraca wpis wyłącznie, jeśli został wystawiony przez wskazanego instruktora."""
+    entry = session.scalar(
+        select(ProgressEntry)
+        .where(ProgressEntry.id == entry_id)
+        .options(joinedload(ProgressEntry.instructor), joinedload(ProgressEntry.client))
+    )
+    if entry is None:
+        raise NotFoundError("Wpis w Dzienniku postępów nie istnieje.")
+    if entry.instructor_id != instructor_id:
+        raise ForbiddenError("Brak uprawnień: możesz modyfikować wyłącznie własne wpisy.")
+    return entry
+
+
+def update_progress_entry(
+    session: Session,
+    *,
+    entry_id: int,
+    instructor_id: int,
+    changes: dict,
+) -> ProgressEntry:
+    """Edytuje wycenę, nazwę drogi lub notatkę własnego wpisu (np. poprawa literówki)."""
+    entry = _get_own_entry(session, entry_id=entry_id, instructor_id=instructor_id)
+
+    if "grade" in changes:
+        entry.grade = changes["grade"].strip()
+    if "route_name" in changes:
+        route = changes["route_name"]
+        entry.route_name = route.strip() if route and route.strip() else None
+    if "instructor_feedback" in changes:
+        entry.instructor_feedback = changes["instructor_feedback"].strip()
+
+    session.commit()
+    return _get_own_entry(session, entry_id=entry_id, instructor_id=instructor_id)
+
+
+def delete_progress_entry(session: Session, *, entry_id: int, instructor_id: int) -> None:
+    """Usuwa własny wpis z Dziennika postępów."""
+    entry = _get_own_entry(session, entry_id=entry_id, instructor_id=instructor_id)
+    session.delete(entry)
+    session.commit()
 
 
 def list_instructor_progress(
