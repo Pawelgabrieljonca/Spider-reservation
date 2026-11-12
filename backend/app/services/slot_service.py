@@ -297,19 +297,34 @@ def _attach_window_details(window: AvailabilityWindow) -> AvailabilityWindow:
             booked_sessions.append(s)
 
         for r in sorted(s.reservations, key=lambda res: res.id):
+            client_obj = r.client
+            verifier_obj = (
+                getattr(client_obj, "experience_verified_by", None) if client_obj else None
+            )
             flat_reservations.append(
                 {
                     "id": r.id,
                     "client_id": r.client_id,
                     "client_name": (
-                        f"{r.client.first_name} {r.client.last_name}".strip()
-                        if r.client
+                        f"{client_obj.first_name} {client_obj.last_name}".strip()
+                        if client_obj
                         else None
                     ),
-                    "client_email": r.client.email if r.client else None,
-                    "client_phone": r.client.phone_number if r.client else None,
-                    "client_shoe_size": r.client.shoe_size if r.client else None,
-                    "client_experience_level": r.client.experience_level if r.client else None,
+                    "client_email": client_obj.email if client_obj else None,
+                    "client_phone": client_obj.phone_number if client_obj else None,
+                    "client_shoe_size": client_obj.shoe_size if client_obj else None,
+                    "client_experience_level": client_obj.experience_level if client_obj else None,
+                    "client_experience_verified": (
+                        bool(client_obj.experience_verified) if client_obj else False
+                    ),
+                    "client_experience_verified_at": (
+                        client_obj.experience_verified_at if client_obj else None
+                    ),
+                    "client_experience_verified_by_name": (
+                        f"{verifier_obj.first_name} {verifier_obj.last_name}".strip()
+                        if verifier_obj
+                        else None
+                    ),
                     "needs_equipment": r.needs_equipment,
                     "status": r.status.value if hasattr(r.status, "value") else str(r.status),
                     "created_at": r.created_at,
@@ -436,6 +451,7 @@ def list_instructor_slots(
             joinedload(AvailabilityWindow.slots)
             .joinedload(TrainingSlot.reservations)
             .joinedload(Reservation.client)
+            .joinedload(User.experience_verified_by)
         )
         .order_by(AvailabilityWindow.start_time.asc(), AvailabilityWindow.id.asc())
     )
@@ -465,6 +481,7 @@ def get_instructor_slot(
             joinedload(AvailabilityWindow.slots)
             .joinedload(TrainingSlot.reservations)
             .joinedload(Reservation.client)
+            .joinedload(User.experience_verified_by)
         )
     )
     window = session.scalars(stmt).unique().one_or_none()

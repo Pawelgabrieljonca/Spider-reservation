@@ -35,7 +35,7 @@ export default function Home() {
             to="/terminy"
             className="inline-flex items-center justify-center min-h-[52px] sm:min-h-[56px] px-8 sm:px-10 py-3.5 sm:py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-base sm:text-lg shadow-xl shadow-slate-950/60 hover:scale-[1.02] active:scale-[0.99] transition-all"
           >
-            Zarezerwuj trening
+            Zobacz terminy
           </Link>
         </div>
       </div>

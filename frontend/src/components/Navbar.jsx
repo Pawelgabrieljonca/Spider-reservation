@@ -89,23 +89,24 @@ export default function Navbar() {
     return (
       <header className="absolute top-0 inset-x-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-14 py-4 sm:py-6 md:py-8 flex items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-6 sm:gap-10">
-            <NavLink
-              to="/"
-              onClick={closeMobile}
-              className="inline-flex items-center shrink-0 focus:outline-none"
-              aria-label="Centrum Wspinaczkowe Spider — strona główna"
-            >
-              <img
-                src="/logospider.png"
-                alt="Centrum Wspinaczkowe Spider"
-                className="h-[72px] sm:h-[104px] md:h-[125px] w-auto object-contain drop-shadow-md"
-              />
-            </NavLink>
+          <NavLink
+            to="/"
+            onClick={closeMobile}
+            className="inline-flex items-center shrink-0 focus:outline-none"
+            aria-label="Centrum Wspinaczkowe Spider — strona główna"
+          >
+            <img
+              src="/logospider.png"
+              alt="Centrum Wspinaczkowe Spider"
+              className="h-[72px] sm:h-[104px] md:h-[125px] w-auto object-contain drop-shadow-md"
+            />
+          </NavLink>
 
-            <nav className="hidden md:flex items-center gap-2" aria-label="Nawigacja strony startowej">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Nawigacja przesunięta w prawo, tuż obok przycisku logowania */}
+            <nav className="hidden md:flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2" aria-label="Nawigacja strony startowej">
               <NavLink
-                to="/app/client"
+                to="/terminy"
                 className="inline-flex items-center min-h-[42px] px-4 py-2 rounded-xl text-sm font-semibold text-white/90 hover:text-white hover:bg-white/10 active:bg-white/20 backdrop-blur-sm transition-colors"
               >
                 Terminy
@@ -117,9 +118,7 @@ export default function Navbar() {
                 Instruktorzy
               </NavLink>
             </nav>
-          </div>
 
-          <div className="flex items-center gap-3">
             {isLoading ? (
               <span className="text-xs sm:text-sm text-white/80 px-3 py-2">
                 Weryfikacja sesji...
@@ -152,7 +151,7 @@ export default function Navbar() {
           <div className="md:hidden border-t border-white/10 bg-slate-950/95 backdrop-blur-md px-5 pt-3 pb-6 space-y-3 shadow-2xl">
             <nav className="flex flex-col gap-1.5" aria-label="Menu mobilne start">
               <NavLink
-                to="/app/client"
+                to="/terminy"
                 onClick={closeMobile}
                 className="flex items-center min-h-[44px] px-4 py-2.5 rounded-xl text-base font-semibold text-white hover:bg-white/10 active:bg-white/15 transition-colors"
               >

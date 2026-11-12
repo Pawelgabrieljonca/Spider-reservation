@@ -3,16 +3,21 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowUpDown,
+  Award,
   CheckCircle2,
+  ClipboardList,
   Pencil,
   Plus,
   Save,
   Search,
+  ShieldCheck,
   Trash2,
   TrendingUp,
   X,
 } from 'lucide-react';
 import apiClient from '../../api/client';
+import ClientVerificationModal from '../../components/ClientVerificationModal';
+import ExperienceLevelBadge from '../../components/ExperienceLevelBadge';
 import GradeConverterModal from '../../components/GradeConverterModal';
 import GradePicker from '../../components/GradePicker';
 import Pagination from '../../components/Pagination';
@@ -26,7 +31,11 @@ import {
   SELECT_CLASS,
   TEXTAREA_CLASS,
 } from '../../styles/ui';
-import { formatDateTime24 } from '../../utils/dateUtils';
+import {
+  EXPERIENCE_LEVEL_OPTIONS,
+  experienceLevelLabel,
+  formatDateTime24,
+} from '../../utils/dateUtils';
 import { extractApiError, getGradeBadgeClasses } from '../../utils/grades';
 
 const MAX_FEEDBACK_LENGTH = 500;
@@ -248,14 +257,16 @@ export default function InstructorProgressPage() {
   const initialClientId = searchParams.get('clientId') || '';
 
   const [entries, setEntries] = useState([]);
-  const [mySlots, setMySlots] = useState([]);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [clientsData, setClientsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [converterOpen, setConverterOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [deletingEntry, setDeletingEntry] = useState(null);
+  const [verifyModalClientId, setVerifyModalClientId] = useState(null);
+  const [levelOverride, setLevelOverride] = useState(null);
+  const [verifyingLevel, setVerifyingLevel] = useState(false);
 
   // Stan formularza nowego wpisu
   const [clientId, setClientId] = useState(initialClientId);
@@ -272,13 +283,12 @@ export default function InstructorProgressPage() {
 
   const fetchAllData = useCallback(async () => {
     try {
-      const [progRes, slotsRes] = await Promise.all([
+      const [progRes, clientsRes] = await Promise.all([
         apiClient.get('/api/v1/instructor/progress'),
-        apiClient.get('/api/v1/instructor/slots'),
+        apiClient.get('/api/v1/instructor/clients'),
       ]);
       setEntries(Array.isArray(progRes.data) ? progRes.data : []);
-      setMySlots(Array.isArray(slotsRes.data) ? slotsRes.data : []);
-      setNowMs(Date.now());
+      setClientsData(Array.isArray(clientsRes.data) ? clientsRes.data : []);
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Błąd pobierania danych Dziennika postępów.'));
     } finally {
@@ -291,13 +301,12 @@ export default function InstructorProgressPage() {
 
     Promise.all([
       apiClient.get('/api/v1/instructor/progress'),
-      apiClient.get('/api/v1/instructor/slots'),
+      apiClient.get('/api/v1/instructor/clients'),
     ])
-      .then(([progRes, slotsRes]) => {
+      .then(([progRes, clientsRes]) => {
         if (!active) return;
         setEntries(Array.isArray(progRes.data) ? progRes.data : []);
-        setMySlots(Array.isArray(slotsRes.data) ? slotsRes.data : []);
-        setNowMs(Date.now());
+        setClientsData(Array.isArray(clientsRes.data) ? clientsRes.data : []);
       })
       .catch((err) => {
         if (active) {
@@ -326,44 +335,21 @@ export default function InstructorProgressPage() {
     };
   }, [fetchAllData]);
 
-  // Ścisła izolacja: wyłącznie klienci z potwierdzoną rezerwacją na własnych slotach instruktora.
-  // Dla każdego wyliczamy datę ostatniego (lub najbliższego) wspólnego treningu.
   const myClients = useMemo(() => {
-    const map = new Map();
-    for (const slot of mySlots) {
-      for (const r of slot.reservations || []) {
-        if (r.status !== 'confirmed' || !r.client_id) continue;
-        const startMs = new Date(r.slot_start || slot.start_time).getTime();
-        const endMs = new Date(r.slot_end || slot.end_time).getTime();
-        const current = map.get(r.client_id) || {
-          id: r.client_id,
-          name: r.client_name || `Klient #${r.client_id}`,
-          lastPastMs: null,
-          nextMs: null,
-        };
-        if (endMs <= nowMs) {
-          if (current.lastPastMs === null || startMs > current.lastPastMs) current.lastPastMs = startMs;
-        } else if (current.nextMs === null || startMs < current.nextMs) {
-          current.nextMs = startMs;
-        }
-        map.set(r.client_id, current);
+    return clientsData.map((c) => {
+      let hint = '';
+      if (c.last_training_at) {
+        hint = `ostatni trening: ${formatShortDate(new Date(c.last_training_at))}`;
+      } else if (c.next_training_at) {
+        hint = `najbliższy trening: ${formatShortDate(new Date(c.next_training_at))}`;
       }
-    }
-    return Array.from(map.values())
-      .map((c) => {
-        let hint = '';
-        if (c.lastPastMs !== null) hint = `ostatni trening: ${formatShortDate(new Date(c.lastPastMs))}`;
-        else if (c.nextMs !== null) hint = `najbliższy trening: ${formatShortDate(new Date(c.nextMs))}`;
-        return { ...c, hint };
-      })
-      .sort((a, b) => {
-        // Najpierw klienci po odbytym treningu (najświeższy na górze), potem z nadchodzącym
-        if (a.lastPastMs !== null && b.lastPastMs !== null) return b.lastPastMs - a.lastPastMs;
-        if (a.lastPastMs !== null) return -1;
-        if (b.lastPastMs !== null) return 1;
-        return (a.nextMs || 0) - (b.nextMs || 0);
-      });
-  }, [mySlots, nowMs]);
+      return {
+        ...c,
+        name: c.full_name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || `Klient #${c.id}`,
+        hint,
+      };
+    });
+  }, [clientsData]);
 
   const effectiveSelectedClientId = useMemo(() => {
     if (clientId && myClients.some((c) => String(c.id) === String(clientId))) {
@@ -372,8 +358,38 @@ export default function InstructorProgressPage() {
     return myClients[0] ? String(myClients[0].id) : '';
   }, [clientId, myClients]);
 
+  const selectedClient = useMemo(
+    () => myClients.find((c) => String(c.id) === String(effectiveSelectedClientId)) || null,
+    [myClients, effectiveSelectedClientId]
+  );
+
+  const selectedLevelForAction =
+    levelOverride !== null ? levelOverride : selectedClient?.experience_level || '';
+
   const prefilledFromCalendar =
     Boolean(initialClientId) && String(initialClientId) === effectiveSelectedClientId;
+
+  const handleVerifyClientLevel = async (targetLevel) => {
+    if (!selectedClient || !targetLevel || verifyingLevel) return;
+    setVerifyingLevel(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await apiClient.patch(`/api/v1/instructor/clients/${selectedClient.id}/experience`, {
+        experience_level: targetLevel,
+        verified: true,
+      });
+      setLevelOverride(null);
+      setSuccessMsg(
+        `Zatwierdzono poziom wspinaczki (${experienceLevelLabel(targetLevel)}) dla ${selectedClient.name}.`
+      );
+      await fetchAllData();
+    } catch (err) {
+      setErrorMsg(extractApiError(err, 'Nie udało się zatwierdzić poziomu wspinacza.'));
+    } finally {
+      setVerifyingLevel(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -519,16 +535,26 @@ export default function InstructorProgressPage() {
                 <select
                   id="known-client-select"
                   value={effectiveSelectedClientId}
-                  onChange={(e) => setClientId(e.target.value)}
+                  onChange={(e) => {
+                    setClientId(e.target.value);
+                    setLevelOverride(null);
+                  }}
                   required
                   className={SELECT_CLASS}
                 >
-                  {myClients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.hint ? ` (${c.hint})` : ''}
-                    </option>
-                  ))}
+                  {myClients.map((c) => {
+                    const lvlText = experienceLevelLabel(c.experience_level);
+                    const lvlPart = lvlText
+                      ? ` • ${lvlText}${c.experience_verified ? ' ✓' : ''}`
+                      : ' • brak poziomu';
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {lvlPart}
+                        {c.hint ? ` (${c.hint})` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
                 {prefilledFromCalendar && (
                   <p className="text-xs text-emerald-700 mt-1.5">
@@ -536,6 +562,88 @@ export default function InstructorProgressPage() {
                   </p>
                 )}
               </div>
+
+              {/* Panel podglądu i zatwierdzania poziomu wspinacza */}
+              {selectedClient && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <Award className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Poziom wspinacza</span>
+                    </div>
+                    <ExperienceLevelBadge
+                      level={selectedClient.experience_level}
+                      verified={selectedClient.experience_verified}
+                      verifiedByName={selectedClient.experience_verified_by_name}
+                      verifiedAt={selectedClient.experience_verified_at}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Wybierz poziom do zatwierdzenia">
+                    {EXPERIENCE_LEVEL_OPTIONS.map((opt) => {
+                      const active = selectedLevelForAction === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setLevelOverride(opt.value)}
+                          aria-pressed={active}
+                          className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                            active
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {opt.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setVerifyModalClientId(selectedClient.id)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-emerald-700 underline decoration-slate-300 underline-offset-4"
+                    >
+                      <ClipboardList className="w-3.5 h-3.5" />
+                      <span>
+                        Notatki i historia
+                        {selectedClient.notes_count > 0 ? ` (${selectedClient.notes_count})` : ''}
+                      </span>
+                    </button>
+
+                    {(() => {
+                      const alreadySameVerified =
+                        Boolean(selectedClient.experience_verified) &&
+                        selectedLevelForAction === selectedClient.experience_level;
+                      return (
+                        <button
+                          type="button"
+                          disabled={!selectedLevelForAction || verifyingLevel || alreadySameVerified}
+                          onClick={() => handleVerifyClientLevel(selectedLevelForAction)}
+                          className={`inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                            alreadySameVerified
+                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-200 cursor-default'
+                              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs disabled:opacity-50'
+                          }`}
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>
+                            {verifyingLevel
+                              ? 'Zatwierdzanie...'
+                              : alreadySameVerified
+                              ? 'Zatwierdzony ✓'
+                              : selectedClient.experience_verified
+                              ? 'Zmień i zatwierdź'
+                              : 'Zatwierdź poziom'}
+                          </span>
+                        </button>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
 
               <GradePicker
                 value={grade}
@@ -667,8 +775,17 @@ export default function InstructorProgressPage() {
                         <td className="py-4 px-4 whitespace-nowrap text-sm text-slate-600">
                           {formatDateTime24(entry.created_at)}
                         </td>
-                        <td className="py-4 px-4 font-semibold text-slate-900">
-                          {entry.client_name || `Klient #${entry.client_id}`}
+                        <td className="py-4 px-4 font-semibold text-slate-900 space-y-1.5">
+                          <div>{entry.client_name || `Klient #${entry.client_id}`}</div>
+                          <div>
+                            <ExperienceLevelBadge
+                              compact
+                              level={entry.client_experience_level}
+                              verified={entry.client_experience_verified}
+                              verifiedByName={entry.client_experience_verified_by_name}
+                              verifiedAt={entry.client_experience_verified_at}
+                            />
+                          </div>
                         </td>
                         <td className="py-4 px-4">
                           <span
@@ -705,10 +822,17 @@ export default function InstructorProgressPage() {
                 {paginatedEntries.map((entry) => (
                   <div key={entry.id} className={`${CARD_CLASS} p-4 space-y-2.5`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+                      <div className="space-y-1">
                         <div className="text-base font-bold text-slate-900">
                           {entry.client_name || `Klient #${entry.client_id}`}
                         </div>
+                        <ExperienceLevelBadge
+                          compact
+                          level={entry.client_experience_level}
+                          verified={entry.client_experience_verified}
+                          verifiedByName={entry.client_experience_verified_by_name}
+                          verifiedAt={entry.client_experience_verified_at}
+                        />
                         <div className="text-xs text-slate-500">
                           {formatDateTime24(entry.created_at)}
                         </div>
@@ -777,6 +901,16 @@ export default function InstructorProgressPage() {
         onClose={() => setConverterOpen(false)}
         initialGrade={editingEntry ? editingEntry.grade : grade}
       />
+
+      {verifyModalClientId && (
+        <ClientVerificationModal
+          key={verifyModalClientId}
+          clientId={verifyModalClientId}
+          initialTab="notes"
+          onClose={() => setVerifyModalClientId(null)}
+          onUpdated={() => fetchAllData()}
+        />
+      )}
     </div>
   );
 }

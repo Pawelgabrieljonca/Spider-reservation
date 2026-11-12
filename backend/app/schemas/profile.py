@@ -17,6 +17,16 @@ class ClientProfileSchema(Schema):
     phone_number = fields.String(dump_only=True, allow_none=True)
     shoe_size = fields.String(dump_only=True, allow_none=True)
     experience_level = fields.String(dump_only=True, allow_none=True)
+    experience_verified = fields.Boolean(dump_only=True)
+    experience_verified_at = fields.DateTime(dump_only=True, allow_none=True)
+    experience_verified_by_name = fields.Function(
+        lambda u: (
+            f"{u.experience_verified_by.first_name} {u.experience_verified_by.last_name}".strip()
+            if getattr(u, "experience_verified_by", None)
+            else None
+        ),
+        dump_only=True,
+    )
     updated_at = fields.DateTime(dump_only=True)
 
 

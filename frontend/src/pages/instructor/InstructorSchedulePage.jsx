@@ -5,9 +5,11 @@ import {
   CalendarClock,
   CheckCheck,
   CheckCircle2,
+  ClipboardList,
   Clock,
   Lock,
   Plus,
+  ShieldCheck,
   Trash2,
   TrendingUp,
   Unlock,
@@ -15,12 +17,13 @@ import {
   X,
 } from 'lucide-react';
 import apiClient from '../../api/client';
+import ClientVerificationModal from '../../components/ClientVerificationModal';
 import CreateShiftModal from '../../components/CreateShiftModal';
+import ExperienceLevelBadge from '../../components/ExperienceLevelBadge';
 import InstructorWeekTimeline from '../../components/InstructorWeekTimeline';
 import SEO from '../../components/SEO';
 import { BTN_DANGER, BTN_PRIMARY, BTN_SECONDARY } from '../../styles/ui';
 import {
-  experienceLevelLabel,
   formatDurationMinutes,
   formatSlotRange24,
   formatTime24,
@@ -79,6 +82,7 @@ function StatusBadge({ status }) {
 export default function InstructorSchedulePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [slots, setSlots] = useState([]);
+  const [clientsList, setClientsList] = useState([]);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -87,6 +91,8 @@ export default function InstructorSchedulePage() {
   const [createState, setCreateState] = useState(() =>
     searchParams.get('add') ? defaultCreateState() : null
   );
+  const [verifyModalState, setVerifyModalState] = useState(null);
+  const [verifyingClientId, setVerifyingClientId] = useState(null);
 
   // Parametr ?add=1 (np. ze starego linku „Dodaj dyżur”) otwiera kreator i jest od razu czyszczony
   useEffect(() => {
@@ -95,8 +101,12 @@ export default function InstructorSchedulePage() {
 
   const fetchSlots = useCallback(async () => {
     try {
-      const res = await apiClient.get('/api/v1/instructor/slots');
-      setSlots(Array.isArray(res.data) ? res.data : []);
+      const [slotsRes, clientsRes] = await Promise.all([
+        apiClient.get('/api/v1/instructor/slots'),
+        apiClient.get('/api/v1/instructor/clients').catch(() => ({ data: [] })),
+      ]);
+      setSlots(Array.isArray(slotsRes.data) ? slotsRes.data : []);
+      if (Array.isArray(clientsRes.data)) setClientsList(clientsRes.data);
       setNowMs(Date.now());
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Błąd pobierania grafiku instruktora.'));
@@ -105,11 +115,14 @@ export default function InstructorSchedulePage() {
 
   useEffect(() => {
     let active = true;
-    apiClient
-      .get('/api/v1/instructor/slots')
-      .then((res) => {
+    Promise.all([
+      apiClient.get('/api/v1/instructor/slots'),
+      apiClient.get('/api/v1/instructor/clients').catch(() => ({ data: [] })),
+    ])
+      .then(([slotsRes, clientsRes]) => {
         if (!active) return;
-        setSlots(Array.isArray(res.data) ? res.data : []);
+        setSlots(Array.isArray(slotsRes.data) ? slotsRes.data : []);
+        if (Array.isArray(clientsRes.data)) setClientsList(clientsRes.data);
         setNowMs(Date.now());
       })
       .catch((err) => {
@@ -125,10 +138,13 @@ export default function InstructorSchedulePage() {
   useEffect(() => {
     const handleRevalidate = () => {
       if (document.visibilityState === 'visible') {
-        apiClient
-          .get('/api/v1/instructor/slots')
-          .then((res) => {
-            setSlots(Array.isArray(res.data) ? res.data : []);
+        Promise.all([
+          apiClient.get('/api/v1/instructor/slots'),
+          apiClient.get('/api/v1/instructor/clients').catch(() => ({ data: [] })),
+        ])
+          .then(([slotsRes, clientsRes]) => {
+            setSlots(Array.isArray(slotsRes.data) ? slotsRes.data : []);
+            if (Array.isArray(clientsRes.data)) setClientsList(clientsRes.data);
             setNowMs(Date.now());
           })
           .catch(() => {});
@@ -143,6 +159,33 @@ export default function InstructorSchedulePage() {
       window.clearInterval(intervalId);
     };
   }, []);
+
+  const clientsById = useMemo(() => {
+    const map = new Map();
+    for (const c of clientsList) map.set(c.id, c);
+    return map;
+  }, [clientsList]);
+
+  const handleQuickVerifyLevel = async (res) => {
+    if (!res?.client_id || !res?.client_experience_level || verifyingClientId) return;
+    setVerifyingClientId(res.client_id);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await apiClient.patch(`/api/v1/instructor/clients/${res.client_id}/experience`, {
+        experience_level: res.client_experience_level,
+        verified: true,
+      });
+      setSuccessMsg(
+        `Zatwierdzono poziom wspinaczkowy dla ${res.client_name || `klienta #${res.client_id}`}.`
+      );
+      await fetchSlots();
+    } catch (err) {
+      setErrorMsg(extractApiError(err, 'Nie udało się zatwierdzić poziomu wspinacza.'));
+    } finally {
+      setVerifyingClientId(null);
+    }
+  };
 
   const handleShiftsCreated = ({ createdCount, failedCount, start, end }) => {
     setCreateState(null);
@@ -421,11 +464,24 @@ export default function InstructorSchedulePage() {
               {selectedSlot.reservations.map((res) => {
                 const sessionStart = res.slot_start || selectedSlot.start_time;
                 const sessionEnd = res.slot_end || selectedSlot.end_time;
-                const expLabel = experienceLevelLabel(res.client_experience_level);
+                const clientSummary = clientsById.get(res.client_id);
+                const level =
+                  clientSummary?.experience_level ?? res.client_experience_level;
+                const verified =
+                  clientSummary?.experience_verified ?? Boolean(res.client_experience_verified);
+                const verifiedByName =
+                  clientSummary?.experience_verified_by_name ??
+                  res.client_experience_verified_by_name;
+                const verifiedAt =
+                  clientSummary?.experience_verified_at ?? res.client_experience_verified_at;
+                const latestNote = clientSummary?.latest_note;
+                const notesCount = clientSummary?.notes_count || 0;
+                const completedCount = clientSummary?.completed_trainings_count || 0;
+
                 return (
                   <div
                     key={res.id}
-                    className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2 shadow-sm"
+                    className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2.5 shadow-sm"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-bold text-slate-900 text-sm sm:text-base">
@@ -436,24 +492,45 @@ export default function InstructorSchedulePage() {
                       />
                     </div>
 
-                    <div className="inline-flex flex-wrap items-center gap-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">
-                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>
-                        {formatTime24(sessionStart)} – {formatTime24(sessionEnd)}
-                      </span>
-                      {res.slot_type && (
-                        <span>• {slotTypeShortLabel(res.slot_type)}</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="inline-flex flex-wrap items-center gap-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">
+                        <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>
+                          {formatTime24(sessionStart)} – {formatTime24(sessionEnd)}
+                        </span>
+                        {res.slot_type && (
+                          <span>• {slotTypeShortLabel(res.slot_type)}</span>
+                        )}
+                      </div>
+
+                      <ExperienceLevelBadge
+                        level={level}
+                        verified={verified}
+                        verifiedByName={verifiedByName}
+                        verifiedAt={verifiedAt}
+                      />
+
+                      {level && !verified && (
+                        <button
+                          type="button"
+                          disabled={verifyingClientId === res.client_id}
+                          onClick={() => handleQuickVerifyLevel(res)}
+                          title="Zatwierdź zadeklarowany poziom wspinacza"
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors disabled:opacity-50"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>
+                            {verifyingClientId === res.client_id
+                              ? 'Zatwierdzanie...'
+                              : 'Zatwierdź poziom'}
+                          </span>
+                        </button>
                       )}
                     </div>
 
                     <div className="text-xs sm:text-sm text-slate-600 space-y-1">
                       <div>E-mail: {res.client_email || '—'}</div>
                       {res.client_phone && <div>Telefon: {res.client_phone}</div>}
-                      {expLabel && (
-                        <div>
-                          Poziom: <strong className="text-slate-800">{expLabel}</strong>
-                        </div>
-                      )}
                       <div>
                         Sprzęt:{' '}
                         {res.needs_equipment ? (
@@ -464,10 +541,37 @@ export default function InstructorSchedulePage() {
                         ) : (
                           <span className="text-slate-700">Własny</span>
                         )}
+                        {completedCount > 0 && (
+                          <span className="ml-2 text-xs text-slate-500">
+                            • Odbyte sesje u Ciebie: <strong>{completedCount}</strong>
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-100">
+                    {latestNote && (
+                      <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-3 py-2 text-xs text-slate-700">
+                        <span className="font-semibold text-slate-900">
+                          Notatka trenerska ({notesCount}):
+                        </span>{' '}
+                        <span className="line-clamp-2">{latestNote}</span>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVerifyModalState({ clientId: res.client_id, initialTab: 'notes' })
+                        }
+                        className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs sm:text-sm font-semibold text-slate-800 transition-colors"
+                      >
+                        <ClipboardList className="w-4 h-4 text-emerald-600" />
+                        <span>
+                          Weryfikuj profil, notatki{notesCount > 0 ? ` (${notesCount})` : ''} i historia
+                        </span>
+                      </button>
+
                       <Link
                         to={`/app/instructor/progress?clientId=${res.client_id}&clientName=${encodeURIComponent(
                           res.client_name || ''
@@ -475,7 +579,7 @@ export default function InstructorSchedulePage() {
                         className="inline-flex items-center gap-1.5 min-h-[38px] text-xs sm:text-sm font-semibold text-emerald-700 hover:text-emerald-800"
                       >
                         <TrendingUp className="w-4 h-4" />
-                        <span>Dodaj wpis w Dzienniku postępów &rarr;</span>
+                        <span>Dziennik postępów &rarr;</span>
                       </Link>
                     </div>
                   </div>
@@ -506,6 +610,16 @@ export default function InstructorSchedulePage() {
           initialHour={createState.hour}
           onClose={() => setCreateState(null)}
           onCreated={handleShiftsCreated}
+        />
+      )}
+
+      {verifyModalState && (
+        <ClientVerificationModal
+          key={verifyModalState.clientId}
+          clientId={verifyModalState.clientId}
+          initialTab={verifyModalState.initialTab}
+          onClose={() => setVerifyModalState(null)}
+          onUpdated={() => fetchSlots()}
         />
       )}
     </div>

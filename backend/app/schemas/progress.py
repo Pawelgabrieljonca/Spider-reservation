@@ -79,6 +79,26 @@ class ProgressEntrySchema(Schema):
         lambda e: f"{e.client.first_name} {e.client.last_name}" if e.client else None,
         dump_only=True,
     )
+    client_experience_level = fields.Function(
+        lambda e: e.client.experience_level if e.client else None,
+        dump_only=True,
+    )
+    client_experience_verified = fields.Function(
+        lambda e: bool(e.client.experience_verified) if e.client else False,
+        dump_only=True,
+    )
+    client_experience_verified_at = fields.Function(
+        lambda e: e.client.experience_verified_at if e.client else None,
+        dump_only=True,
+    )
+    client_experience_verified_by_name = fields.Function(
+        lambda e: (
+            f"{e.client.experience_verified_by.first_name} {e.client.experience_verified_by.last_name}".strip()
+            if e.client and getattr(e.client, "experience_verified_by", None)
+            else None
+        ),
+        dump_only=True,
+    )
     grade = fields.String(dump_only=True, metadata={"example": "VI.1+"})
     route_name = fields.String(dump_only=True, allow_none=True)
     instructor_feedback = fields.String(dump_only=True)

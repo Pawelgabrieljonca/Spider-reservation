@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeftRight,
@@ -7,11 +8,13 @@ import {
   Calendar,
   RefreshCw,
   Search,
+  ShieldCheck,
   TrendingUp,
   User,
   X,
 } from 'lucide-react';
 import apiClient from '../../api/client';
+import ExperienceLevelBadge from '../../components/ExperienceLevelBadge';
 import GradeConverterModal from '../../components/GradeConverterModal';
 import Pagination from '../../components/Pagination';
 import SEO from '../../components/SEO';
@@ -21,7 +24,7 @@ import {
   INPUT_CLASS,
   SELECT_CLASS,
 } from '../../styles/ui';
-import { formatDateTime24 } from '../../utils/dateUtils';
+import { experienceLevelLabel, formatDateTime24 } from '../../utils/dateUtils';
 import {
   extractApiError,
   getGradeBadgeClasses,
@@ -31,6 +34,7 @@ import {
 
 export default function ClientProgressPage() {
   const [entries, setEntries] = useState([]);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [converterOpen, setConverterOpen] = useState(false);
@@ -45,8 +49,12 @@ export default function ClientProgressPage() {
   const fetchProgress = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/api/v1/client/progress');
-      setEntries(Array.isArray(res.data) ? res.data : []);
+      const [progRes, profRes] = await Promise.all([
+        apiClient.get('/api/v1/client/progress'),
+        apiClient.get('/api/v1/client/profile').catch(() => ({ data: null })),
+      ]);
+      setEntries(Array.isArray(progRes.data) ? progRes.data : []);
+      if (profRes.data) setProfile(profRes.data);
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Błąd pobierania Dziennika postępów.'));
     } finally {
@@ -56,10 +64,14 @@ export default function ClientProgressPage() {
 
   useEffect(() => {
     let active = true;
-    apiClient
-      .get('/api/v1/client/progress')
-      .then((res) => {
-        if (active) setEntries(Array.isArray(res.data) ? res.data : []);
+    Promise.all([
+      apiClient.get('/api/v1/client/progress'),
+      apiClient.get('/api/v1/client/profile').catch(() => ({ data: null })),
+    ])
+      .then(([progRes, profRes]) => {
+        if (!active) return;
+        setEntries(Array.isArray(progRes.data) ? progRes.data : []);
+        if (profRes.data) setProfile(profRes.data);
       })
       .catch((err) => {
         if (active) {
@@ -131,13 +143,54 @@ export default function ClientProgressPage() {
       </div>
 
       {/* Podsumowanie postępów */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`${CARD_CLASS} p-5 flex items-center justify-between gap-3`}>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-500">Poziom wspinacza</p>
+            <div className="mt-1.5">
+              {profile?.experience_level ? (
+                <div className="space-y-1">
+                  <div className="text-lg font-extrabold text-slate-900 leading-tight">
+                    {experienceLevelLabel(profile.experience_level)}
+                  </div>
+                  <ExperienceLevelBadge
+                    compact
+                    level={profile.experience_level}
+                    verified={profile.experience_verified}
+                    verifiedByName={profile.experience_verified_by_name}
+                    verifiedAt={profile.experience_verified_at}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-base font-bold text-slate-600">Nieokreślony</div>
+                  <Link
+                    to="/app/client/profile"
+                    className="inline-block text-xs font-semibold text-emerald-700 hover:underline"
+                  >
+                    Uzupełnij w profilu &rarr;
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+          <div
+            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+              profile?.experience_verified
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+        </div>
+
         <div className={`${CARD_CLASS} p-5 flex items-center justify-between`}>
           <div>
             <p className="text-sm font-medium text-slate-500">Zarejestrowane przejścia</p>
             <p className="text-2xl font-extrabold text-slate-900 mt-1">{entries.length}</p>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+          <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
             <TrendingUp className="w-5 h-5" />
           </div>
         </div>
@@ -147,7 +200,7 @@ export default function ClientProgressPage() {
             <p className="text-sm font-medium text-slate-500">Najwyższa wycena</p>
             <p className="text-2xl font-mono font-extrabold text-slate-900 mt-1">{highestGrade}</p>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+          <div className="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
             <Award className="w-5 h-5" />
           </div>
         </div>
@@ -159,7 +212,7 @@ export default function ClientProgressPage() {
               {entries[0] ? formatDateTime24(entries[0].created_at) : 'Brak wpisów'}
             </p>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
+          <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
             <Calendar className="w-5 h-5" />
           </div>
         </div>

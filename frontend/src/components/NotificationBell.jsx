@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
+  Award,
   Bell,
   CalendarCheck,
   CheckCheck,
@@ -38,6 +39,13 @@ function NotificationCategoryIcon({ category }) {
     return (
       <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
         <TrendingUp className="w-4 h-4" />
+      </div>
+    );
+  }
+  if (category === 'EXPERIENCE_VERIFIED') {
+    return (
+      <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+        <Award className="w-4 h-4" />
       </div>
     );
   }

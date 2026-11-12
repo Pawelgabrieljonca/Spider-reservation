@@ -39,7 +39,14 @@ def _has_confirmed_training_with_instructor(
     return session.scalar(stmt) is not None
 
 
-def _ensure_valid_client_for_instructor(
+def _progress_load_options():
+    return (
+        joinedload(ProgressEntry.instructor),
+        joinedload(ProgressEntry.client).joinedload(User.experience_verified_by),
+    )
+
+
+def ensure_valid_client_for_instructor(
     session: Session,
     *,
     instructor_id: int,
@@ -47,7 +54,11 @@ def _ensure_valid_client_for_instructor(
     allow_existing_authored_entry: bool = False,
 ) -> User:
     """Weryfikuje istnienie klienta, jego rolę oraz relację treningową z instruktorem."""
-    user = session.scalar(select(User).where(User.id == client_id))
+    user = session.scalar(
+        select(User)
+        .where(User.id == client_id)
+        .options(joinedload(User.experience_verified_by))
+    )
     if user is None:
         raise ClientNotFoundError()
 
@@ -76,12 +87,15 @@ def _ensure_valid_client_for_instructor(
     )
 
 
+_ensure_valid_client_for_instructor = ensure_valid_client_for_instructor
+
+
 def list_client_progress(session: Session, *, client_id: int) -> list[ProgressEntry]:
     """Pobiera wpisy postępu zalogowanego klienta (wyłącznie do własnego wglądu klienta)."""
     stmt = (
         select(ProgressEntry)
         .where(ProgressEntry.client_id == client_id)
-        .options(joinedload(ProgressEntry.instructor), joinedload(ProgressEntry.client))
+        .options(*_progress_load_options())
         .order_by(ProgressEntry.created_at.desc(), ProgressEntry.id.desc())
     )
     return list(session.scalars(stmt))
@@ -94,7 +108,7 @@ def list_client_progress_for_instructor(
     client_id: int,
 ) -> list[ProgressEntry]:
     """Pobiera historię postępów klienta dla instruktora (po weryfikacji relacji treningowej)."""
-    _ensure_valid_client_for_instructor(
+    ensure_valid_client_for_instructor(
         session,
         instructor_id=instructor_id,
         client_id=client_id,
@@ -113,7 +127,7 @@ def create_progress_entry(
     route_name: str | None = None,
 ) -> ProgressEntry:
     """Tworzy nowy wpis w Dzienniku postępów wyłącznie dla klienta trenującego u instruktora."""
-    _ensure_valid_client_for_instructor(
+    ensure_valid_client_for_instructor(
         session,
         instructor_id=instructor_id,
         client_id=client_id,
@@ -139,7 +153,7 @@ def create_progress_entry(
     return session.scalars(
         select(ProgressEntry)
         .where(ProgressEntry.id == entry.id)
-        .options(joinedload(ProgressEntry.instructor), joinedload(ProgressEntry.client))
+        .options(*_progress_load_options())
     ).one()
 
 
@@ -148,7 +162,7 @@ def _get_own_entry(session: Session, *, entry_id: int, instructor_id: int) -> Pr
     entry = session.scalar(
         select(ProgressEntry)
         .where(ProgressEntry.id == entry_id)
-        .options(joinedload(ProgressEntry.instructor), joinedload(ProgressEntry.client))
+        .options(*_progress_load_options())
     )
     if entry is None:
         raise NotFoundError("Wpis w Dzienniku postępów nie istnieje.")
@@ -196,7 +210,7 @@ def list_instructor_progress(
     stmt = (
         select(ProgressEntry)
         .where(ProgressEntry.instructor_id == instructor_id)
-        .options(joinedload(ProgressEntry.instructor), joinedload(ProgressEntry.client))
+        .options(*_progress_load_options())
         .order_by(ProgressEntry.created_at.desc(), ProgressEntry.id.desc())
     )
     if client_id is not None:

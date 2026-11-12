@@ -1,6 +1,7 @@
 import enum
+from datetime import datetime
 from typing import List
-from sqlalchemy import String, Enum
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
@@ -29,9 +30,21 @@ class User(Base, TimestampMixin):
     phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     shoe_size: Mapped[str | None] = mapped_column(String(16), nullable=True)
     experience_level: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    experience_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    experience_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    experience_verified_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.CLIENT, nullable=False)
 
     # Relacje SQLAlchemy:
+    experience_verified_by: Mapped["User | None"] = relationship(
+        "User",
+        foreign_keys=[experience_verified_by_id],
+        remote_side="User.id",
+    )
     availability_windows: Mapped[List["AvailabilityWindow"]] = relationship(
         back_populates="instructor", cascade="all, delete-orphan"
     )
@@ -41,6 +54,11 @@ class User(Base, TimestampMixin):
     reservations: Mapped[List["Reservation"]] = relationship(back_populates="client")
     progress_records: Mapped[List["ProgressEntry"]] = relationship(
         foreign_keys="[ProgressEntry.client_id]", back_populates="client"
+    )
+    coaching_notes_about_client: Mapped[List["InstructorClientNote"]] = relationship(
+        foreign_keys="[InstructorClientNote.client_id]",
+        back_populates="client",
+        cascade="all, delete-orphan",
     )
     notifications: Mapped[List["InAppNotification"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

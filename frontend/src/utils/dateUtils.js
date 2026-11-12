@@ -116,6 +116,27 @@ export function formatDurationMinutes(totalMinutes) {
   return `${h}h ${m}m`;
 }
 
+export const EXPERIENCE_LEVEL_OPTIONS = [
+  {
+    value: 'BEGINNER',
+    title: 'Początkujący',
+    description:
+      'Pierwsze wizyty na ściance, nauka podstaw asekuracji, bezpiecznego odpadania i techniki nóg.',
+  },
+  {
+    value: 'INTERMEDIATE',
+    title: 'Średniozaawansowany',
+    description:
+      'Swobodne wspinanie na wędkę lub z dolną asekuracją, praca nad płynnością ruchu (ok. V – VI.2).',
+  },
+  {
+    value: 'ADVANCED',
+    title: 'Zaawansowany',
+    description:
+      'Trening ukierunkowany na wynik, przewieszenia, bouldering siłowy oraz taktykę przejść RP/OS.',
+  },
+];
+
 export function experienceLevelLabel(level) {
   if (level === 'BEGINNER') return 'Początkujący';
   if (level === 'INTERMEDIATE') return 'Średniozaawansowany';

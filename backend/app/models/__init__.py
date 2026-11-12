@@ -3,6 +3,7 @@ from app.models.user import User, UserRole, ExperienceLevel
 from app.models.slot import AvailabilityWindow, TrainingSlot, SlotType
 from app.models.reservation import Reservation, ReservationStatus
 from app.models.progress import ProgressEntry
+from app.models.client_note import InstructorClientNote
 from app.models.notification import InAppNotification, NotificationCategory
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "Reservation",
     "ReservationStatus",
     "ProgressEntry",
+    "InstructorClientNote",
     "InAppNotification",
     "NotificationCategory",
 ]

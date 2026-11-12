@@ -21,33 +21,14 @@ import {
   SELECT_CLASS,
 } from '../../styles/ui';
 import SEO from '../../components/SEO';
+import ExperienceLevelBadge from '../../components/ExperienceLevelBadge';
+import { EXPERIENCE_LEVEL_OPTIONS, formatDate24 } from '../../utils/dateUtils';
 import { extractApiError } from '../../utils/grades';
 
 const SHOE_SIZE_OPTIONS = [];
 for (let size = 34; size <= 48; size += 0.5) {
   SHOE_SIZE_OPTIONS.push(Number.isInteger(size) ? String(size) : size.toFixed(1));
 }
-
-const EXPERIENCE_OPTIONS = [
-  {
-    value: 'BEGINNER',
-    title: 'Początkujący',
-    description:
-      'Pierwsze wizyty na ściance, nauka podstaw asekuracji, bezpiecznego odpadania i techniki nóg.',
-  },
-  {
-    value: 'INTERMEDIATE',
-    title: 'Średniozaawansowany',
-    description:
-      'Swobodne wspinanie na wędkę lub z dolną asekuracją, praca nad płynnością ruchu (ok. V – VI.2).',
-  },
-  {
-    value: 'ADVANCED',
-    title: 'Zaawansowany',
-    description:
-      'Trening ukierunkowany na wynik, przewieszenia, bouldering siłowy oraz taktykę przejść RP/OS.',
-  },
-];
 
 export default function ClientProfilePage() {
   const [loading, setLoading] = useState(true);
@@ -63,6 +44,10 @@ export default function ClientProfilePage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [shoeSize, setShoeSize] = useState('');
   const [experienceLevel, setExperienceLevel] = useState('');
+  const [savedExperienceLevel, setSavedExperienceLevel] = useState('');
+  const [experienceVerified, setExperienceVerified] = useState(false);
+  const [experienceVerifiedAt, setExperienceVerifiedAt] = useState(null);
+  const [experienceVerifiedByName, setExperienceVerifiedByName] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -79,6 +64,10 @@ export default function ClientProfilePage() {
         setPhoneNumber(data.phone_number || '');
         setShoeSize(data.shoe_size || '');
         setExperienceLevel(data.experience_level || '');
+        setSavedExperienceLevel(data.experience_level || '');
+        setExperienceVerified(Boolean(data.experience_verified));
+        setExperienceVerifiedAt(data.experience_verified_at || null);
+        setExperienceVerifiedByName(data.experience_verified_by_name || null);
       })
       .catch((err) => {
         if (active) setErrorMsg(extractApiError(err, 'Nie udało się wczytać profilu wspinacza.'));
@@ -109,6 +98,10 @@ export default function ClientProfilePage() {
       setPhoneNumber(updated.phone_number || '');
       setShoeSize(updated.shoe_size || '');
       setExperienceLevel(updated.experience_level || '');
+      setSavedExperienceLevel(updated.experience_level || '');
+      setExperienceVerified(Boolean(updated.experience_verified));
+      setExperienceVerifiedAt(updated.experience_verified_at || null);
+      setExperienceVerifiedByName(updated.experience_verified_by_name || null);
       setSuccessMsg(
         'Twój profil wspinacza został zapisany. Dane będą automatycznie podpowiadane podczas rezerwacji.'
       );
@@ -261,11 +254,19 @@ export default function ClientProfilePage() {
 
           {/* Poziom zaawansowania */}
           <div className="space-y-2.5 pt-2 border-t border-slate-100">
-            <div className="flex items-center justify-between gap-2">
-              <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                <Award className="w-4 h-4 text-emerald-600" />
-                <span>Poziom zaawansowania wspinaczkowego</span>
-              </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                  <Award className="w-4 h-4 text-emerald-600" />
+                  <span>Poziom zaawansowania wspinaczkowego</span>
+                </label>
+                <ExperienceLevelBadge
+                  level={savedExperienceLevel}
+                  verified={experienceVerified}
+                  verifiedByName={experienceVerifiedByName}
+                  verifiedAt={experienceVerifiedAt}
+                />
+              </div>
               {experienceLevel && (
                 <button
                   type="button"
@@ -277,8 +278,27 @@ export default function ClientProfilePage() {
               )}
             </div>
 
+            {experienceVerified && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">
+                Twój poziom został zatwierdzony przez instruktora
+                {experienceVerifiedByName ? (
+                  <>
+                    {' '}
+                    <strong>{experienceVerifiedByName}</strong>
+                  </>
+                ) : null}
+                {experienceVerifiedAt ? ` (${formatDate24(experienceVerifiedAt)})` : ''}.
+                {experienceLevel !== savedExperienceLevel && (
+                  <span className="block mt-1 font-semibold text-amber-800">
+                    Uwaga: ręczna zmiana poziomu spowoduje usunięcie zatwierdzenia do czasu ponownej
+                    weryfikacji przez instruktora.
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {EXPERIENCE_OPTIONS.map((opt) => {
+              {EXPERIENCE_LEVEL_OPTIONS.map((opt) => {
                 const selected = experienceLevel === opt.value;
                 return (
                   <button

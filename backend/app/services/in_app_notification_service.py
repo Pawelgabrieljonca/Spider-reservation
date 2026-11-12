@@ -260,6 +260,41 @@ def emit_progress_entry_notification(session: Session, *, entry_id: int) -> None
     session.commit()
 
 
+def _experience_level_pl(level: str | None) -> str:
+    if level == "BEGINNER":
+        return "Początkujący"
+    if level == "INTERMEDIATE":
+        return "Średniozaawansowany"
+    if level == "ADVANCED":
+        return "Zaawansowany"
+    return level or "—"
+
+
+def emit_experience_verified_notification(
+    session: Session,
+    *,
+    client_id: int,
+    instructor_id: int,
+    experience_level: str,
+) -> None:
+    instructor = session.scalar(select(User).where(User.id == instructor_id))
+    inst_name = (
+        f"{instructor.first_name} {instructor.last_name}".strip()
+        if instructor is not None
+        else "Instruktor CW Spider"
+    )
+    level_pl = _experience_level_pl(experience_level)
+    create_notification(
+        session,
+        user_id=client_id,
+        category=NotificationCategory.EXPERIENCE_VERIFIED,
+        title="Zatwierdzono poziom wspinaczkowy",
+        body=f"Instruktor {inst_name} zatwierdził Twój poziom zaawansowania: {level_pl}.",
+        link_url="/app/client/profile",
+    )
+    session.commit()
+
+
 def ensure_upcoming_reminders(
     session: Session,
     *,

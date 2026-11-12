@@ -11,6 +11,7 @@ class NotificationCategory(str, enum.Enum):
     GROUP_SPOT_FREED = "GROUP_SPOT_FREED"
     REMINDER_24H = "REMINDER_24H"
     PROGRESS_ADDED = "PROGRESS_ADDED"
+    EXPERIENCE_VERIFIED = "EXPERIENCE_VERIFIED"
 
 
 class InAppNotification(Base, TimestampMixin):

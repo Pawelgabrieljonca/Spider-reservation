@@ -142,6 +142,11 @@ class InstructorReservationSchema(Schema):
     client_phone = fields.Method("get_client_phone", dump_only=True)
     client_shoe_size = fields.Method("get_client_shoe_size", dump_only=True)
     client_experience_level = fields.Method("get_client_experience_level", dump_only=True)
+    client_experience_verified = fields.Method("get_client_experience_verified", dump_only=True)
+    client_experience_verified_at = fields.Method("get_client_experience_verified_at", dump_only=True)
+    client_experience_verified_by_name = fields.Method(
+        "get_client_experience_verified_by_name", dump_only=True
+    )
     needs_equipment = fields.Method("get_needs_equipment", dump_only=True)
     status = fields.Method("get_status_value", dump_only=True)
     created_at = fields.Method("get_created_at", dump_only=True)
@@ -178,6 +183,25 @@ class InstructorReservationSchema(Schema):
         if isinstance(obj, dict):
             return obj.get("client_experience_level")
         return obj.client.experience_level if getattr(obj, "client", None) else None
+
+    def get_client_experience_verified(self, obj):
+        if isinstance(obj, dict):
+            return bool(obj.get("client_experience_verified"))
+        return bool(obj.client.experience_verified) if getattr(obj, "client", None) else False
+
+    def get_client_experience_verified_at(self, obj):
+        if isinstance(obj, dict):
+            val = obj.get("client_experience_verified_at")
+            return val.isoformat() if hasattr(val, "isoformat") else val
+        val = obj.client.experience_verified_at if getattr(obj, "client", None) else None
+        return val.isoformat() if hasattr(val, "isoformat") else val
+
+    def get_client_experience_verified_by_name(self, obj):
+        if isinstance(obj, dict):
+            return obj.get("client_experience_verified_by_name")
+        client = getattr(obj, "client", None)
+        verifier = getattr(client, "experience_verified_by", None) if client else None
+        return f"{verifier.first_name} {verifier.last_name}".strip() if verifier else None
 
     def get_needs_equipment(self, obj):
         return bool(self._val(obj, "needs_equipment"))
