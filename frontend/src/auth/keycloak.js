@@ -1,9 +1,9 @@
 import Keycloak from 'keycloak-js';
 
 const keycloak = new Keycloak({
-  url: 'http://localhost:8080',
-  realm: 'spider-climbing',
-  clientId: 'spider-frontend',
+  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
+  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'spider-climbing',
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'spider-frontend',
 });
 
 export default keycloak;
