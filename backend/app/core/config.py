@@ -5,8 +5,10 @@ from dotenv import load_dotenv
 
 # Jawna ścieżka do .env w katalogu głównym repozytorium (backend/app/core -> root),
 # niezależna od bieżącego katalogu roboczego (flask CLI, alembic, pytest).
-_ROOT_ENV = Path(__file__).resolve().parents[3] / ".env"
-load_dotenv(_ROOT_ENV)
+# W kontenerze Docker zmienne środowiskowe przekazuje docker-compose (override=False).
+_PARENTS = Path(__file__).resolve().parents
+if len(_PARENTS) > 3:
+    load_dotenv(_PARENTS[3] / ".env")
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -25,6 +27,9 @@ class Settings:
     SQL_ECHO: bool = _env_bool("SQL_ECHO", False)
 
     KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "http://localhost:8080")
+    # Wewnętrzny adres Keycloaka do pobierania JWKS (w sieci Dockera: http://keycloak:8080).
+    # Rozdzielony od KEYCLOAK_URL, aby weryfikacja pola `iss` nadal zgadzała się z publicznym adresem.
+    KEYCLOAK_INTERNAL_URL: str = os.getenv("KEYCLOAK_INTERNAL_URL", "") or KEYCLOAK_URL
     KEYCLOAK_REALM: str = os.getenv("KEYCLOAK_REALM", "spider-climbing")
     KEYCLOAK_CLIENT_ID: str = os.getenv("KEYCLOAK_CLIENT_ID", "spider-frontend")
 
@@ -46,7 +51,7 @@ class Settings:
 
     @property
     def KEYCLOAK_JWKS_URL(self) -> str:
-        return f"{self.KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
+        return f"{self.KEYCLOAK_INTERNAL_URL}/realms/{self.KEYCLOAK_REALM}/protocol/openid-connect/certs"
 
 
 settings = Settings()
