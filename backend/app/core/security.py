@@ -1,13 +1,3 @@
-"""Uwierzytelnianie i autoryzacja: weryfikacja tokenów JWT wydawanych przez Keycloak.
-
-Przepływ:
-  1. Token Bearer jest weryfikowany kluczem publicznym z JWKS realmu (RS256, `iss`, `exp`).
-  2. `azp` musi wskazywać klienta frontendowego (token wydany dla naszej aplikacji).
-  3. Role pochodzą z `realm_access.roles` (ROLE_CLIENT / ROLE_INSTRUCTOR / ROLE_ADMIN).
-  4. Lokalny rekord `users` jest tworzony przy pierwszym żądaniu (JIT provisioning)
-     i synchronizowany z najwyższą rolą z tokenu.
-"""
-
 import functools
 
 import jwt
@@ -15,29 +5,23 @@ from flask import g, request
 from flask_smorest import abort
 from jwt import PyJWKClient
 from jwt.exceptions import PyJWKClientConnectionError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.config import settings
-from app.core.database import db_session
+from app.core.config import db_session, settings
 from app.models import User, UserRole
 
-# Fragment do @blp.doc(**SECURITY_DOC) – przycisk "Authorize" w Swagger UI.
 SECURITY_DOC = {"security": [{"bearerAuth": []}]}
 
-# Klucze JWKS są pobierane leniwie i cache'owane (brak ruchu sieciowego przy imporcie).
 _jwks_client = PyJWKClient(settings.KEYCLOAK_JWKS_URL, cache_keys=True, lifespan=3600)
 
-# Od najwyższej do najniższej – rola zapisywana w tabeli users.
-_ROLE_PRIORITY = (UserRole.ADMIN, UserRole.INSTRUCTOR, UserRole.CLIENT)
-
+_ROLE_PRIORITY = (UserRole.INSTRUCTOR, UserRole.CLIENT)
 
 def _extract_token() -> str:
     scheme, _, token = request.headers.get("Authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
         abort(401, message="Brak nagłówka Authorization: Bearer <token>.")
     return token.strip()
-
 
 def _decode_token(token: str) -> dict:
     try:
@@ -47,7 +31,6 @@ def _decode_token(token: str) -> dict:
             signing_key.key,
             algorithms=["RS256"],
             issuer=settings.KEYCLOAK_ISSUER,
-            # Keycloak dla klienta publicznego wystawia aud=account, więc weryfikujemy `azp`.
             options={"require": ["exp", "iss", "sub"], "verify_aud": False},
         )
     except PyJWKClientConnectionError:
@@ -59,51 +42,76 @@ def _decode_token(token: str) -> dict:
         abort(401, message="Token wystawiony dla innej aplikacji.")
     return claims
 
-
 def _token_roles(claims: dict) -> set[UserRole]:
     names = set(claims.get("realm_access", {}).get("roles", []))
-    return {role for role in UserRole if role.value in names}
-
+    return {role for role in _ROLE_PRIORITY if role.value in names}
 
 def _provision_user(claims: dict, roles: set[UserRole]) -> User:
     role = next(r for r in _ROLE_PRIORITY if r in roles)
-    user = db_session.scalar(select(User).where(User.keycloak_id == claims["sub"]))
+    sub = claims["sub"]
+    email = (claims.get("email") or "").strip()
+    email_verified = bool(claims.get("email_verified"))
+    first_name = (claims.get("given_name") or "").strip() or "-"
+    last_name = (claims.get("family_name") or "").strip() or "-"
+
+    user = db_session.scalar(select(User).where(User.keycloak_id == sub))
+
+    if user is None and email and email_verified:
+        user = db_session.scalar(select(User).where(func.lower(User.email) == email.lower()))
+        if user is not None:
+            user.keycloak_id = sub
+            user.email = email
+            user.first_name = first_name
+            user.last_name = last_name
+            user.role = role
+            db_session.commit()
+            return user
 
     if user is None:
-        if not claims.get("email"):
+        if not email:
             abort(403, message="Konto w Keycloak nie ma adresu e-mail.")
         user = User(
-            keycloak_id=claims["sub"],
-            email=claims["email"],
-            first_name=claims.get("given_name") or "-",
-            last_name=claims.get("family_name") or "-",
+            keycloak_id=sub,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
             role=role,
         )
         db_session.add(user)
         try:
             db_session.commit()
         except IntegrityError:
-            # Równoległe pierwsze żądania tego samego użytkownika – wygrywa pierwszy INSERT.
             db_session.rollback()
-            user = db_session.scalar(select(User).where(User.keycloak_id == claims["sub"]))
+            user = db_session.scalar(select(User).where(User.keycloak_id == sub))
             if user is None:
                 abort(409, message="Konflikt danych konta (adres e-mail jest już używany).")
-    elif user.role != role:
+        return user
+
+    changed = False
+    if user.role != role:
         user.role = role
-        db_session.commit()
+        changed = True
+    if first_name != "-" and user.first_name != first_name:
+        user.first_name = first_name
+        changed = True
+    if last_name != "-" and user.last_name != last_name:
+        user.last_name = last_name
+        changed = True
+    if email and email_verified and user.email.lower() != email.lower():
+        user.email = email
+        changed = True
+    if changed:
+        try:
+            db_session.commit()
+        except IntegrityError:
+            db_session.rollback()
+            abort(409, message="Konflikt danych konta (adres e-mail jest już używany).")
     return user
 
-
 def current_user() -> User | None:
-    """Zalogowany użytkownik (dostępny wewnątrz endpointu chronionego `require_roles` lub `optional_roles`)."""
     return getattr(g, "current_user", None)
 
-
 def require_roles(*allowed: UserRole):
-    """Dekorator endpointu: wymaga ważnego tokenu z co najmniej jedną z podanych ról.
-
-    Umieszczaj go NAD @blp.arguments, aby autoryzacja wykonywała się przed walidacją danych.
-    """
 
     def decorator(view):
         @functools.wraps(view)
@@ -121,11 +129,7 @@ def require_roles(*allowed: UserRole):
 
     return decorator
 
-
 def optional_roles(*allowed: UserRole):
-    """Dekorator endpointu: jeśli podano Bearer token, weryfikuje go i ustawia `g.current_user`.
-    Jeśli żądanie jest anonimowe (brak nagłówka Authorization), przechodzi dalej z `g.current_user = None`.
-    """
 
     def decorator(view):
         @functools.wraps(view)

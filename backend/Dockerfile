@@ -5,21 +5,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Warstwa zależności (cache przy przebudowach kodu)
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Kod aplikacji i migracje Alembic
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
 
-# Uruchamianie jako użytkownik bez uprawnień roota
 RUN useradd --create-home --shell /bin/sh appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 5001
 
-# Migracje przy starcie + serwer WSGI Gunicorn
 CMD ["sh", "-c", "alembic upgrade head && gunicorn --bind 0.0.0.0:5001 --workers 2 --threads 4 --access-logfile - 'app.main:create_app()'"]
